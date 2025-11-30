@@ -415,7 +415,6 @@ def chat(request: ChatRequest):
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=request.message,
-            tools=[{"google_search": {}}]
         )
         # Assuming you want to display the generated text
         return {"answer": response.text}
