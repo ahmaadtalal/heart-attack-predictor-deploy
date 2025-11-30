@@ -6,6 +6,8 @@ import os
 import pandas as pd
 import numpy as np
 from collections import Counter
+from google import genai
+from pydantic import BaseModel
 
 # CORRECTED IMPORTS: Since Render runs the app from the 'backend' directory,
 # we use direct imports instead of 'from backend import...' or relative imports.
@@ -13,24 +15,34 @@ import models, schemas, crud, auth, ml_model
 from database import SessionLocal, engine
 
 # --- Configuration ---
-# Read API KEY from environment variable for security
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# For security, best practice is to specify front-end domain in deployment (e.g., https://your-frontend.onrender.com)
-# Using "*" during initial testing allows the frontend on Vercel/Netlify to connect easily.
-ALLOWED_ORIGINS = ["*"] 
+# --- CORS FIX: Explicitly allowed domains for cross-origin requests ---
+# This list MUST include the exact Netlify domain to resolve the CORS block.
+NETLIFY_URL = "https://stunning-klepon-b4761c.netlify.app"
+RENDER_URL = "https://heart-attack-predictor-deploy.onrender.com"
+
+ALLOWED_ORIGINS = [
+    # Local Development
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    # Deployed URLs (REQUIRED for cross-domain calls)
+    NETLIFY_URL,
+    RENDER_URL,
+] 
+# ---------------------------------------------------------------------
 
 
 # Initialize FastAPI app
 app = FastAPI(title="Heart Risk App")
 
 # Create database tables if they do not exist
-# This is safe to run on startup; SQLAlchemy checks if tables exist first.
 models.Base.metadata.create_all(bind=engine)
 
 # ------------------ CORS ------------------
 app.add_middleware(
     CORSMiddleware,
+    # Use the explicit list
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
@@ -174,7 +186,7 @@ def evaluate(eval_in: schemas.EvalIn,
 @app.get("/dashboard-analysis")
 def dashboard_analysis():
     # Load dataset. The path is relative to the backend directory on Render.
-    df = pd.read_csv("cardio_train.csv") # <-- Corrected path assuming file is in backend/
+    df = pd.read_csv("cardio_train.csv")
     
     # Preprocess dataset with comprehensive cleaning
     df = preprocess_cardio_data(df)
@@ -207,8 +219,6 @@ def dashboard_analysis():
     
     line_data = {"Female": line_data_female, "Male": line_data_male}
     
-    # ... [Rest of your analysis logic] ...
-
     # --- Pie chart: Risk distribution by Gender ---
     gender_risk = []
     for gender in ['Female', 'Male']:
@@ -385,22 +395,15 @@ def dashboard_analysis():
 
 # ------------------ Gemini Chat ------------------
 
-from fastapi import FastAPI
-from pydantic import BaseModel
-from google import genai
+class ChatRequest(BaseModel):
+    message: str
 
-# !!! SECURITY FIX: READ API KEY FROM ENVIRONMENT VARIABLE !!!
-API_KEY = os.environ.get("GEMINI_API_KEY")
-
-if not API_KEY:
+if not GEMINI_API_KEY:
     # If key is missing, handle gracefully by printing a warning and setting client to None
     print("Warning: GEMINI_API_KEY environment variable is not set. Chatbot functionality will be disabled.")
     client = None
 else:
-    client = genai.Client(api_key=API_KEY)
-
-class ChatRequest(BaseModel):
-    message: str
+    client = genai.Client(api_key=GEMINI_API_KEY)
 
 @app.post("/chat")
 def chat(request: ChatRequest):
