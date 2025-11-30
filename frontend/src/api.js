@@ -1,10 +1,14 @@
-const BASE_URL = "http://127.0.0.1:8000"; // Backend URL
+// --- CORRECTED BASE URL ---
+// In a deployed environment, process.env.REACT_APP_API_URL holds the Render URL:
+// https://heart-attack-predictor-deploy.onrender.com
+// For local development, this defaults to undefined, so we set a fallback.
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000";
 
 // --------------------
 // Register
 // --------------------
 export async function register(data) {
-  const res = await fetch(`${BASE_URL}/register`, {
+  const res = await fetch(`${API_BASE_URL}/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -20,7 +24,8 @@ export async function register(data) {
 // Login / Token
 // --------------------
 export async function login(email, password) {
-  const res = await fetch(`${BASE_URL}/token`, {
+  // FastAPI expects form data for token endpoint
+  const res = await fetch(`${API_BASE_URL}/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ username: email, password }),
@@ -33,10 +38,10 @@ export async function login(email, password) {
 }
 
 // --------------------
-// Get current user info
+// Get current user info (assuming this is needed by the frontend)
 // --------------------
 export async function me(token) {
-  const res = await fetch(`${BASE_URL}/me`, {
+  const res = await fetch(`${API_BASE_URL}/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -50,7 +55,7 @@ export async function me(token) {
 // Predict evaluation
 // --------------------
 export async function predict(evalData, token) {
-  const res = await fetch(`${BASE_URL}/evaluate`, {
+  const res = await fetch(`${API_BASE_URL}/evaluate`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -66,7 +71,7 @@ export async function predict(evalData, token) {
 
   const data = await res.json();
 
-  // Return exactly the fields EvalForm expects
+  // Return the processed prediction data
   return {
     result: {
       probability: data.risk,
@@ -85,51 +90,28 @@ export async function predict(evalData, token) {
 // --------------------
 // Dashboard
 // --------------------
+// NOTE: Dashboard.jsx uses axios directly for dashboard-analysis,
+// but this function seems intended for fetching user-specific evaluations.
+// Corrected to reflect this common pattern.
 export async function dashboard(token) {
-  const res = await fetch(`${BASE_URL}/dashboard`, {
+  const res = await await fetch(`${API_BASE_URL}/dashboard-analysis`, {
     headers: { Authorization: `Bearer ${token}` },
   });
+
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.detail || "Failed to fetch dashboard data");
   }
 
   const data = await res.json();
-
-  // For medic: return all users with their evaluations
-  // For normal user: return only their evaluations
-  // Ensure risk is included for chart
-  if (Array.isArray(data)) {
-    return data
-      .map((item) => {
-        if (item.evaluations) {
-          return item.evaluations.map((e) => ({
-            id: e.id,
-            risk: e.risk,
-            created_at: e.created_at,
-          }));
-        } else {
-          return {
-            id: item.id,
-            risk: item.risk,
-            created_at: item.created_at,
-          };
-        }
-      })
-      .flat();
-  }
-
   return data;
 }
 
 // --------------------
-// Chat
-// --------------------
-// --------------------
 // Chat via Gemini
 // --------------------
 export async function chat(message, token) {
-  const res = await fetch(`${BASE_URL}/chat`, {
+  const res = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -145,6 +127,5 @@ export async function chat(message, token) {
 
   const data = await res.json();
 
-  // Gemini returns { answer: "..." }
   return data;
 }
