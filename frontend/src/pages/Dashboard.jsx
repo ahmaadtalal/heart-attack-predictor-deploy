@@ -58,7 +58,7 @@ export default function Dashboard({ userName, onLogout }) {
 
   // NOTE: 'lifestyleImpact' variable was removed per ESLint warning
   // Now we use useState just to hold the data, the unused warning for it is gone.
-  const [lifestyleImpactData, setLifestyleImpactData] = useState({});
+  const [setLifestyleImpactData] = useState({});
 
   const [cholesterolAnalysis, setCholesterolAnalysis] = useState([]);
   const [glucoseAnalysis, setGlucoseAnalysis] = useState([]);
@@ -926,9 +926,6 @@ export default function Dashboard({ userName, onLogout }) {
               angle={0}
               textAnchor="middle"
               tick={({ x, y, payload }) => {
-                const info = cholesterolAnalysis.find(
-                  (item) => item.label === payload.value
-                );
                 return (
                   <text
                     x={x}
@@ -1005,9 +1002,6 @@ export default function Dashboard({ userName, onLogout }) {
               angle={0}
               textAnchor="middle"
               tick={({ x, y, payload }) => {
-                const info = glucoseAnalysis.find(
-                  (item) => item.label === payload.value
-                );
                 return (
                   <text
                     x={x}
