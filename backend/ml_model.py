@@ -61,15 +61,15 @@ def train_and_evaluate(csv_path="backend/cardio_train.csv"):
     return model
 
 def predict_risk(features: dict):
+    # FEATURE_ORDER and MODEL_PATH are globally available in this file.
+    # No need to import them inside the function scope or use 'backend.ml_model' prefix.
     import joblib, numpy as np
-    from backend.ml_model import FEATURE_ORDER, MODEL_PATH
-
+    
     model = joblib.load(MODEL_PATH)
-    print("Loaded model type:", type(model))  # Should print RandomForestClassifier
-
+    print("Loaded model type:", type(model)) 
+    
     arr = np.array([[float(features[k]) for k in FEATURE_ORDER]])
     return float(model.predict_proba(arr)[0][1])
-
 
 if __name__ == "__main__":
     train_and_evaluate()

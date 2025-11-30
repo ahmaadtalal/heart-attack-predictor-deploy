@@ -1,10 +1,7 @@
-
-
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
-from backend import models, schemas
-#from .ml_model import predict_risk  # your ML function
-from . import ml_model
+import models, schemas
+import ml_model
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
-from backend import models, crud
+import models, crud
 from .database import SessionLocal
 
 # Secret key for JWT
