@@ -6,7 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix
 
-MODEL_PATH = "backend/model.joblib"
+MODEL_PATH = "model.joblib"
 FEATURE_ORDER = ['age', 'gender', 'weight', 'cholesterol', 'ap_hi', 'ap_lo', 'smoke', 'active']
 
 def preprocess(df):
@@ -21,7 +21,7 @@ def preprocess(df):
     df = df.dropna()
     return df
 
-def train_and_evaluate(csv_path="backend/cardio_train.csv"):
+def train_and_evaluate(csv_path="cardio_train.csv"):
     df = pd.read_csv(csv_path)
     df = preprocess(df)
 
