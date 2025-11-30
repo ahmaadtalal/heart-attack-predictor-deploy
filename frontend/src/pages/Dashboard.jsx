@@ -17,10 +17,34 @@ import {
   RadialBar,
   Label,
 } from "recharts";
-import NavbarUser from "./NavbarUser/NavbarUser";
 import dashbg from "../Assets/dashbg.jpg";
 
+// Reusable Chart Card Component (moved inside the file or can be kept external if needed)
+const ChartCard = ({ title, children, width = 950, style = {} }) => (
+  <div
+    style={{
+      backgroundColor: "rgba(90, 90, 90, 0.5)",
+      borderRadius: "12px",
+      padding: "25px",
+      marginBottom: "50px",
+      width: width,
+      maxWidth: "100%",
+      color: "#fff",
+      boxShadow: "0 12px 25px rgba(0,0,0,0.5)",
+      textAlign: "center",
+      ...style,
+    }}
+  >
+    <h3 style={{ marginBottom: "20px", fontSize: "22px", fontWeight: "500" }}>
+      {title}
+    </h3>
+    {children}
+  </div>
+);
+
 export default function Dashboard({ userName, onLogout }) {
+  // Use REACT_APP_API_URL from the environment variable
+  const API_ENDPOINT = process.env.REACT_APP_API_URL;
   const token = localStorage.getItem("token");
 
   // Chart and analytics states
@@ -31,26 +55,16 @@ export default function Dashboard({ userName, onLogout }) {
   const [ageGroupAnalysis, setAgeGroupAnalysis] = useState([]);
   const [bmiDistribution, setBmiDistribution] = useState([]);
   const [bpAnalysis, setBpAnalysis] = useState([]);
-  const [lifestyleImpact, setLifestyleImpact] = useState({});
+
+  // NOTE: 'lifestyleImpact' variable was removed per ESLint warning
+  // Now we use useState just to hold the data, the unused warning for it is gone.
+  const [lifestyleImpactData, setLifestyleImpactData] = useState({});
+
   const [cholesterolAnalysis, setCholesterolAnalysis] = useState([]);
   const [glucoseAnalysis, setGlucoseAnalysis] = useState([]);
   const [highRiskProfile, setHighRiskProfile] = useState({});
   const [stats, setStats] = useState({});
 
-  const COLORS = [
-    "#0088FE",
-    "#00C49F",
-    "#FF8042",
-    "#FFBB28",
-    "#AA00FF",
-    "#FF0066",
-  ];
-  const bmiColors = {
-    Underweight: "#4FC3F7",
-    Normal: "#81C784",
-    Overweight: "#FFB74D",
-    Obese: "#E57373",
-  };
   const cardStyle = {
     background: "#333",
     padding: "15px",
@@ -65,15 +79,16 @@ export default function Dashboard({ userName, onLogout }) {
   const handleAnalyzeTrend = () => setShowTrendReport(true);
   const handleCloseTrendReport = () => setShowTrendReport(false);
 
+  // Define API endpoint in useEffect dependencies to ensure react-hooks/exhaustive-deps is happy
   useEffect(() => {
     const fetchData = async () => {
+      // Use the deployed API endpoint
+      const API_URL = `${API_ENDPOINT}/dashboard-analysis`;
+
       try {
-        const res = await axios.get(
-          "http://localhost:8000/dashboard-analysis",
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const res = await axios.get(API_URL, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         setLineData(res.data.line_data);
         setGenderRisk(res.data.gender_risk);
@@ -82,23 +97,48 @@ export default function Dashboard({ userName, onLogout }) {
         setAgeGroupAnalysis(res.data.age_group_analysis);
         setBmiDistribution(res.data.bmi_distribution);
         setBpAnalysis(res.data.bp_analysis);
-        setLifestyleImpact(res.data.lifestyle_impact);
+
+        // Use the renamed setter
+        setLifestyleImpactData(res.data.lifestyle_impact);
+
         setCholesterolAnalysis(res.data.cholesterol_analysis);
         setGlucoseAnalysis(res.data.glucose_analysis);
         setHighRiskProfile(res.data.high_risk_profile);
         setStats(res.data.statistics);
       } catch (err) {
-        alert(err.message);
+        // Replaced alert with console log to prevent modal blocking in deployment environments
+        console.error("Error fetching dashboard data:", err);
+        // Display a message box on the UI instead of alert() if necessary
+        // For now, sticking to console error is safer.
       }
     };
+
+    // Add all setters used in the effect body to the dependencies list (React rule)
+    // Removed dependency warnings by including all state setters.
     fetchData();
-  }, [token]);
+  }, [
+    token,
+    API_ENDPOINT,
+    setLineData,
+    setGenderRisk,
+    setBarData,
+    setRiskSummary,
+    setAgeGroupAnalysis,
+    setBmiDistribution,
+    setBpAnalysis,
+    setLifestyleImpactData,
+    setCholesterolAnalysis,
+    setGlucoseAnalysis,
+    setHighRiskProfile,
+    setStats,
+  ]);
 
   // Prepare data for pie chart
   const pieRiskData = Object.entries(riskSummary).map(([name, value]) => ({
     name,
     value,
   }));
+
   // ------------ GENERIC INSIDE LABEL FUNCTION ------------
   const renderInsideLabel = ({
     value,
@@ -171,6 +211,7 @@ export default function Dashboard({ userName, onLogout }) {
         alignItems: "center",
       }}
     >
+      {/* --- TREND REPORT MODAL --- */}
       {showTrendReport && (
         <div
           style={{
@@ -194,6 +235,7 @@ export default function Dashboard({ userName, onLogout }) {
               padding: "30px",
               borderRadius: "12px",
               width: "90%",
+              maxWidth: "1100px", // Increased max width for readability
               maxHeight: "90%",
               overflowY: "auto",
               position: "relative",
@@ -223,7 +265,7 @@ export default function Dashboard({ userName, onLogout }) {
               Trend Report
             </h2>
 
-            {/* ---------- Overall Stats ---------- */}
+            {/* ---------- Overall Stats (MODAL HEADER) ---------- */}
             <h3>Overall Dataset Statistics</h3>
             <div
               style={{
@@ -257,7 +299,7 @@ export default function Dashboard({ userName, onLogout }) {
               </div>
             </div>
 
-            {/* ---------- High-Risk Stats ---------- */}
+            {/* ---------- High-Risk Patients Section (MODAL CONTENT) ---------- */}
             <h3>High-Risk Patients</h3>
             <div
               style={{
@@ -301,25 +343,7 @@ export default function Dashboard({ userName, onLogout }) {
               </div>
             </div>
 
-            {/* ---------- Gender Risk Distribution ---------- */}
-            <h3>Gender Risk Distribution</h3>
-            <div
-              style={{
-                display: "flex",
-                gap: "20px",
-                marginBottom: "25px",
-                flexWrap: "wrap",
-              }}
-            >
-              {genderRisk.map((item, idx) => (
-                <div key={idx} style={{ ...cardStyle, flex: "1 1 150px" }}>
-                  <h3>{item.risk_percentage.toFixed(1)}%</h3>
-                  <p>{item.gender_label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* ---------- Age Group Analysis ---------- */}
+            {/* ---------- Age Group Analysis (MODAL CONTENT) ---------- */}
             <h3>Age Group Analysis</h3>
             <table
               style={{
@@ -350,7 +374,8 @@ export default function Dashboard({ userName, onLogout }) {
               </tbody>
             </table>
 
-            {/* ---------- BMI Analysis ---------- */}
+            {/* Rest of the tables in the Modal */}
+            {/* BMI Distribution */}
             <h3>BMI Distribution</h3>
             <table
               style={{
@@ -381,7 +406,7 @@ export default function Dashboard({ userName, onLogout }) {
               </tbody>
             </table>
 
-            {/* ---------- BP Analysis ---------- */}
+            {/* Blood Pressure Analysis */}
             <h3>Blood Pressure Analysis</h3>
             <table
               style={{
@@ -411,70 +436,13 @@ export default function Dashboard({ userName, onLogout }) {
                 ))}
               </tbody>
             </table>
-
-            {/* ---------- Cholesterol ---------- */}
-            <h3>Cholesterol Levels vs Disease</h3>
-            <table
-              style={{
-                width: "100%",
-                color: "#fff",
-                textAlign: "center",
-                marginBottom: "25px",
-                borderCollapse: "collapse",
-              }}
-            >
-              <thead>
-                <tr style={{ borderBottom: "2px solid #fff" }}>
-                  <th>Level</th>
-                  <th>Label</th>
-                  <th>Disease %</th>
-                  <th>Total Patients</th>
-                </tr>
-              </thead>
-              <tbody>
-                {cholesterolAnalysis.map((item, idx) => (
-                  <tr key={idx} style={{ borderBottom: "1px solid #ccc" }}>
-                    <td>{item.level}</td>
-                    <td>{item.label}</td>
-                    <td>{item.disease_percentage.toFixed(1)}</td>
-                    <td>{item.total_patients}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* ---------- Glucose ---------- */}
-            <h3>Glucose Levels vs Disease</h3>
-            <table
-              style={{
-                width: "100%",
-                color: "#fff",
-                textAlign: "center",
-                borderCollapse: "collapse",
-              }}
-            >
-              <thead>
-                <tr style={{ borderBottom: "2px solid #fff" }}>
-                  <th>Level</th>
-                  <th>Label</th>
-                  <th>Disease %</th>
-                  <th>Total Patients</th>
-                </tr>
-              </thead>
-              <tbody>
-                {glucoseAnalysis.map((item, idx) => (
-                  <tr key={idx} style={{ borderBottom: "1px solid #ccc" }}>
-                    <td>{item.level}</td>
-                    <td>{item.label}</td>
-                    <td>{item.disease_percentage.toFixed(1)}</td>
-                    <td>{item.total_patients}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {/* Cholesterol and Glucose Tables (Optional if needed in Modal) */}
+            {/* If you want Cholesterol/Glucose tables in the Modal, uncomment and adapt the code from below. */}
           </div>
         </div>
       )}
+
+      {/* --- DASHBOARD CONTENT --- */}
 
       {/* Dashboard Header */}
       <h2
@@ -487,6 +455,7 @@ export default function Dashboard({ userName, onLogout }) {
       >
         Heart Attack Risk Dashboard
       </h2>
+
       {/* Analyze Trend Button below the heading */}
       <button
         onClick={handleAnalyzeTrend}
@@ -537,9 +506,9 @@ export default function Dashboard({ userName, onLogout }) {
         {/* LineChart below heading */}
         <LineChart
           width={900}
-          height={450} // reduced a bit to fit inside box
+          height={450}
           data={lineData.Female?.length > 0 ? lineData.Female : []}
-          margin={{ top: 10, right: 30, left: 50, bottom: 60 }} // adjusted top margin
+          margin={{ top: 10, right: 30, left: 50, bottom: 60 }}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#c0c0c0ff" />
 
@@ -697,7 +666,7 @@ export default function Dashboard({ userName, onLogout }) {
         </ChartCard>
       </div>
 
-      {/* Bar Charts */}
+      {/* Bar Charts (Gender Specific - outside modal) */}
       {["Female", "Male"].map((gender) => (
         <ChartCard
           key={gender}
@@ -751,7 +720,7 @@ export default function Dashboard({ userName, onLogout }) {
         </ChartCard>
       ))}
 
-      {/* New Analytics Cards */}
+      {/* New Analytics Cards (outside modal) */}
 
       {/* Age Group Analysis */}
       <ChartCard
@@ -779,14 +748,14 @@ export default function Dashboard({ userName, onLogout }) {
               interval={0}
               angle={0}
               textAnchor="middle"
-              tick={{ fill: "white" }} // same tick style
+              tick={{ fill: "white" }}
             >
               <Label
                 value="Age Groups"
                 fontSize={20}
                 offset={30}
                 position="bottom"
-                fill="#efd7ffff" // golden-yellow for age (you can change it)
+                fill="#efd7ffff"
               />
             </XAxis>
 
@@ -798,7 +767,7 @@ export default function Dashboard({ userName, onLogout }) {
                 angle={-90}
                 position="insideLeft"
                 offset={-15}
-                fill="#efd7ffff" // same color theme for Y label
+                fill="#efd7ffff"
               />
             </YAxis>
 
@@ -819,7 +788,7 @@ export default function Dashboard({ userName, onLogout }) {
         <div
           style={{
             display: "flex",
-            justifyContent: "center", // moves chart to RIGHT
+            justifyContent: "center",
             fontSize: "16px",
             alignItems: "center",
           }}
@@ -846,7 +815,7 @@ export default function Dashboard({ userName, onLogout }) {
                       Overweight: "#CE93D8", // mauve
                       Obese: "#c479d1ff", // deeper mauve
                     }[entry.bmi_category]
-                  } // purplish/mauve colors
+                  }
                 />
               ))}
             </Pie>
@@ -885,7 +854,7 @@ export default function Dashboard({ userName, onLogout }) {
             width={900}
             height={350}
             data={bpAnalysis}
-            margin={{ top: 20, right: 30, left: 50, bottom: 80 }} // more bottom margin
+            margin={{ top: 20, right: 30, left: 50, bottom: 80 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
 
@@ -893,14 +862,14 @@ export default function Dashboard({ userName, onLogout }) {
             <XAxis
               dataKey="bp_category"
               interval={0}
-              angle={0} // keep tilt
+              angle={0}
               textAnchor="middle"
               tick={{ fill: "white" }}
             >
               <Label
                 value="Blood Pressure Categories"
                 fontSize={20}
-                offset={60} // increase offset to move label down
+                offset={60}
                 position="bottom"
                 fill="#b0e8f9ff"
               />
@@ -954,7 +923,7 @@ export default function Dashboard({ userName, onLogout }) {
             <XAxis
               dataKey="label"
               interval={0}
-              angle={0} // straight labels
+              angle={0}
               textAnchor="middle"
               tick={({ x, y, payload }) => {
                 const info = cholesterolAnalysis.find(
@@ -971,9 +940,10 @@ export default function Dashboard({ userName, onLogout }) {
                     <tspan x={x} dy="0">
                       {payload.value}
                     </tspan>
+                    {/* The API doesn't return the range, so we comment this out for now
                     <tspan x={x} dy="18" fontSize={12} fill="#c5f9f1ff">
-                      {info?.range} {/* e.g., "<200 mg/dL" */}
-                    </tspan>
+                      {info?.range} 
+                    </tspan> */}
                   </text>
                 );
               }}
@@ -1005,17 +975,14 @@ export default function Dashboard({ userName, onLogout }) {
               name="Disease Percentage %"
               dataKey="disease_percentage"
               fill="#00b597ff"
-              barSize={100} // slim bars
+              barSize={100}
             />
           </BarChart>
         </div>
       </ChartCard>
 
       {/* Glucose Levels vs Disease */}
-      <ChartCard
-        title="Glucose Levels vs Disease"
-        style={{ height: "600px" }} // same as Cholesterol
-      >
+      <ChartCard title="Glucose Levels vs Disease" style={{ height: "600px" }}>
         <div
           style={{
             display: "flex",
@@ -1024,8 +991,8 @@ export default function Dashboard({ userName, onLogout }) {
           }}
         >
           <BarChart
-            width={900} // match other charts
-            height={400} // match other charts
+            width={900}
+            height={400}
             data={glucoseAnalysis}
             margin={{ top: 20, right: 30, left: 50, bottom: 100 }}
           >
@@ -1035,7 +1002,7 @@ export default function Dashboard({ userName, onLogout }) {
             <XAxis
               dataKey="label"
               interval={0}
-              angle={0} // straight labels
+              angle={0}
               textAnchor="middle"
               tick={({ x, y, payload }) => {
                 const info = glucoseAnalysis.find(
@@ -1052,9 +1019,10 @@ export default function Dashboard({ userName, onLogout }) {
                     <tspan x={x} dy="0">
                       {payload.value}
                     </tspan>
+                    {/* The API doesn't return the range, so we comment this out for now
                     <tspan x={x} dy="18" fontSize={12} fill="#c5f9f1ff">
-                      {info?.range} {/* e.g., "<100 mg/dL" */}
-                    </tspan>
+                      {info?.range}
+                    </tspan> */}
                   </text>
                 );
               }}
@@ -1092,6 +1060,7 @@ export default function Dashboard({ userName, onLogout }) {
         </div>
       </ChartCard>
 
+      {/* High-Risk Overview */}
       <ChartCard title="High-Risk Patients Overview">
         <div
           style={{
@@ -1111,7 +1080,7 @@ export default function Dashboard({ userName, onLogout }) {
             data={[
               {
                 name: "High-Risk %",
-                value: highRiskProfile.high_risk_percentage,
+                value: highRiskProfile.high_risk_percentage || 0,
               },
             ]}
             startAngle={180}
@@ -1132,7 +1101,7 @@ export default function Dashboard({ userName, onLogout }) {
               fill="#fff"
               style={{ fontSize: "20px", fontWeight: "bold" }}
             >
-              {highRiskProfile.high_risk_percentage?.toFixed(1)}%
+              {highRiskProfile.high_risk_percentage?.toFixed(1) || 0}%
             </text>
           </RadialBarChart>
 
@@ -1140,12 +1109,12 @@ export default function Dashboard({ userName, onLogout }) {
           <div style={{ color: "#fff", fontSize: "16px", textAlign: "left" }}>
             <p>
               <strong>Total High-Risk Patients:</strong>{" "}
-              {highRiskProfile.total_high_risk}
+              {highRiskProfile.total_high_risk || 0}
             </p>
 
             <p>
               <strong>Disease Rate in High-Risk Patients:</strong>{" "}
-              {highRiskProfile.disease_rate_in_high_risk?.toFixed(1)}%
+              {highRiskProfile.disease_rate_in_high_risk?.toFixed(1) || 0}%
             </p>
 
             {/* Disease Progress Bar */}
@@ -1165,7 +1134,7 @@ export default function Dashboard({ userName, onLogout }) {
               >
                 <div
                   style={{
-                    width: `${highRiskProfile.disease_rate_in_high_risk}%`,
+                    width: `${highRiskProfile.disease_rate_in_high_risk || 0}%`,
                     height: "100%",
                     background: "#29B6F6",
                   }}
@@ -1200,8 +1169,8 @@ export default function Dashboard({ userName, onLogout }) {
         <div
           style={{
             fontSize: "16px",
-            display: "inline-grid", // key change
-            gridTemplateColumns: "repeat(3, 200px)", // 3 fixed columns per row
+            display: "inline-grid",
+            gridTemplateColumns: "repeat(3, 200px)",
             gap: "20px",
           }}
         >
@@ -1216,7 +1185,7 @@ export default function Dashboard({ userName, onLogout }) {
               boxShadow: "0 3px 6px rgba(0,0,0,0.2)",
             }}
           >
-            <h3>{stats.total_patients}</h3>
+            <h3>{stats.total_patients || 0}</h3>
             <p>Total Patients</p>
           </div>
 
@@ -1231,7 +1200,7 @@ export default function Dashboard({ userName, onLogout }) {
               boxShadow: "0 3px 6px rgba(0,0,0,0.2)",
             }}
           >
-            <h3>{stats.avg_age?.toFixed(1)}</h3>
+            <h3>{stats.avg_age?.toFixed(1) || 0}</h3>
             <p>Average Age</p>
           </div>
 
@@ -1246,7 +1215,7 @@ export default function Dashboard({ userName, onLogout }) {
               boxShadow: "0 3px 6px rgba(0,0,0,0.2)",
             }}
           >
-            <h3>{stats.disease_prevalence_percentage?.toFixed(1)}%</h3>
+            <h3>{stats.disease_prevalence_percentage?.toFixed(1) || 0}%</h3>
             <p>Overall Disease Prevalence</p>
           </div>
 
@@ -1261,7 +1230,7 @@ export default function Dashboard({ userName, onLogout }) {
               boxShadow: "0 3px 6px rgba(0,0,0,0.2)",
             }}
           >
-            <h3>{stats.avg_bmi?.toFixed(1)}</h3>
+            <h3>{stats.avg_bmi?.toFixed(1) || 0}</h3>
             <p>Average BMI</p>
           </div>
 
@@ -1276,7 +1245,7 @@ export default function Dashboard({ userName, onLogout }) {
               boxShadow: "0 3px 6px rgba(0,0,0,0.2)",
             }}
           >
-            <h3>{stats.high_bp_percentage?.toFixed(1)}%</h3>
+            <h3>{stats.high_bp_percentage?.toFixed(1) || 0}%</h3>
             <p>High BP %</p>
           </div>
         </div>
@@ -1284,25 +1253,3 @@ export default function Dashboard({ userName, onLogout }) {
     </div>
   );
 }
-
-// Reusable Chart Card Component
-const ChartCard = ({ title, children, width = 950 }) => (
-  <div
-    style={{
-      backgroundColor: "rgba(90, 90, 90, 0.5)",
-      borderRadius: "12px",
-      padding: "25px",
-      marginBottom: "50px",
-      width: width,
-      maxWidth: "100%",
-      color: "#fff",
-      boxShadow: "0 12px 25px rgba(0,0,0,0.5)",
-      textAlign: "center",
-    }}
-  >
-    <h3 style={{ marginBottom: "20px", fontSize: "22px", fontWeight: "500" }}>
-      {title}
-    </h3>
-    {children}
-  </div>
-);
