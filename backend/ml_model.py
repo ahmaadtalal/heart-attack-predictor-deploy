@@ -6,12 +6,13 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix
 
+# CORRECTED PATH: Relative to the backend directory where the model lives.
 MODEL_PATH = "model.joblib"
 FEATURE_ORDER = ['age', 'gender', 'weight', 'cholesterol', 'ap_hi', 'ap_lo', 'smoke', 'active']
 
 def preprocess(df):
     # Fix obvious invalid data
-    df = df[df['ap_hi'] >= df['ap_lo']]  # systolic >= diastolic
+    df = df[df['ap_hi'] >= df['ap_lo']] 
     df = df.drop_duplicates()
 
     # Ensure numeric features
@@ -40,7 +41,7 @@ def train_and_evaluate(csv_path="cardio_train.csv"):
         n_estimators=400,
         max_depth=12,
         random_state=42,
-        class_weight='balanced',  # handles class imbalance
+        class_weight='balanced',
         min_samples_split=10,
         min_samples_leaf=4,
         n_jobs=-1
@@ -61,15 +62,16 @@ def train_and_evaluate(csv_path="cardio_train.csv"):
     return model
 
 def predict_risk(features: dict):
-    # FEATURE_ORDER and MODEL_PATH are globally available in this file.
-    # No need to import them inside the function scope or use 'backend.ml_model' prefix.
-    import joblib, numpy as np
+    import joblib, pandas as pd
     
+    # Use global constants defined in this file (MODEL_PATH, FEATURE_ORDER)
     model = joblib.load(MODEL_PATH)
-    print("Loaded model type:", type(model)) 
     
-    arr = np.array([[float(features[k]) for k in FEATURE_ORDER]])
-    return float(model.predict_proba(arr)[0][1])
+    # FIX: Create DataFrame from input dict to retain feature names
+    input_df = pd.DataFrame([features], columns=FEATURE_ORDER)
+    
+    # The actual prediction uses the DataFrame
+    return float(model.predict_proba(input_df)[0][1])
 
 if __name__ == "__main__":
     train_and_evaluate()

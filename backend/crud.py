@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
+import pandas as pd # <-- REQUIRED for the updated ml_model.predict_risk function
 import models, schemas
 import ml_model
 
@@ -35,8 +36,11 @@ def authenticate_user(db: Session, email: str, password: str):
     return user
 
 def create_evaluation(db: Session, user_id: int, eval_in: schemas.EvalIn):
+    # Prepare data for model prediction
     features = eval_in.dict()
     age_in_days = features["age"] * 365
+    
+    # Pass features in the exact dictionary format expected by the model
     features_for_model = {
         "age": age_in_days,
         "gender": features["gender"],
@@ -47,7 +51,11 @@ def create_evaluation(db: Session, user_id: int, eval_in: schemas.EvalIn):
         "smoke": bool(features["smoke"]),
         "active": bool(features["active"]),
     }
+    
+    # Prediction: ml_model.predict_risk now handles converting this dict to a DataFrame
     risk = ml_model.predict_risk(features_for_model)
+    
+    # Save the evaluation entry to the database
     entry = models.Evaluation(user_id=user_id, **features_for_model, risk=risk)
     db.add(entry)
     db.commit()

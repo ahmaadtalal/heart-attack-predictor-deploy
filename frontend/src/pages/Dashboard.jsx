@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import {
   LineChart,
   Line,
@@ -18,8 +17,9 @@ import {
   Label,
 } from "recharts";
 import dashbg from "../Assets/dashbg.jpg";
+import { dashboard } from "../api"; // Import the centralized dashboard fetcher
 
-// Reusable Chart Card Component (moved inside the file or can be kept external if needed)
+// Reusable Chart Card Component
 const ChartCard = ({ title, children, width = 950, style = {} }) => (
   <div
     style={{
@@ -43,7 +43,7 @@ const ChartCard = ({ title, children, width = 950, style = {} }) => (
 );
 
 export default function Dashboard({ userName, onLogout }) {
-  // Use REACT_APP_API_URL from the environment variable
+  // Use REACT_APP_API_URL from the environment variable (used by axios)
   const API_ENDPOINT = process.env.REACT_APP_API_URL;
   const token = localStorage.getItem("token");
 
@@ -56,8 +56,8 @@ export default function Dashboard({ userName, onLogout }) {
   const [bmiDistribution, setBmiDistribution] = useState([]);
   const [bpAnalysis, setBpAnalysis] = useState([]);
 
-  // NOTE: 'lifestyleImpact' variable was removed per ESLint warning
-  // Now we use useState just to hold the data, the unused warning for it is gone.
+  // NOTE: This setter is used in the try block below to consume the data,
+  // keeping it here prevents ESLint warnings without breaking the API consumption flow.
   const [setLifestyleImpactData] = useState({});
 
   const [cholesterolAnalysis, setCholesterolAnalysis] = useState([]);
@@ -82,39 +82,33 @@ export default function Dashboard({ userName, onLogout }) {
   // Define API endpoint in useEffect dependencies to ensure react-hooks/exhaustive-deps is happy
   useEffect(() => {
     const fetchData = async () => {
-      // Use the deployed API endpoint
-      const API_URL = `${API_ENDPOINT}/dashboard-analysis`;
-
       try {
-        const res = await axios.get(API_URL, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // FIX: Use the imported centralized dashboard function instead of axios directly
+        const res = await dashboard(token); // This returns the raw JSON response data
 
-        setLineData(res.data.line_data);
-        setGenderRisk(res.data.gender_risk);
-        setBarData(res.data.bar_data);
-        setRiskSummary(res.data.risk_summary);
-        setAgeGroupAnalysis(res.data.age_group_analysis);
-        setBmiDistribution(res.data.bmi_distribution);
-        setBpAnalysis(res.data.bp_analysis);
+        // All setters must now use 'res' directly, as 'dashboard' returns the data itself.
+        setLineData(res.line_data);
+        setGenderRisk(res.gender_risk);
+        setBarData(res.bar_data);
+        setRiskSummary(res.risk_summary);
+        setAgeGroupAnalysis(res.age_group_analysis);
+        setBmiDistribution(res.bmi_distribution);
+        setBpAnalysis(res.bp_analysis);
 
-        // Use the renamed setter
-        setLifestyleImpactData(res.data.lifestyle_impact);
+        // Use the renamed setter to consume data
+        setLifestyleImpactData(res.lifestyle_impact);
 
-        setCholesterolAnalysis(res.data.cholesterol_analysis);
-        setGlucoseAnalysis(res.data.glucose_analysis);
-        setHighRiskProfile(res.data.high_risk_profile);
-        setStats(res.data.statistics);
+        setCholesterolAnalysis(res.cholesterol_analysis);
+        setGlucoseAnalysis(res.glucose_analysis);
+        setHighRiskProfile(res.high_risk_profile);
+        setStats(res.statistics);
       } catch (err) {
-        // Replaced alert with console log to prevent modal blocking in deployment environments
-        console.error("Error fetching dashboard data:", err);
-        // Display a message box on the UI instead of alert() if necessary
-        // For now, sticking to console error is safer.
+        // This catches network and API errors from the 'dashboard' function
+        console.error("Error fetching dashboard data:", err.message);
       }
     };
 
-    // Add all setters used in the effect body to the dependencies list (React rule)
-    // Removed dependency warnings by including all state setters.
+    // Dependencies include all necessary values used within the effect
     fetchData();
   }, [
     token,
@@ -537,8 +531,8 @@ export default function Dashboard({ userName, onLogout }) {
               angle: -90,
               position: "insideLeft",
               offset: -10,
-              fontSize: 18,
               fill: "#f1961eff",
+              fontSize: 18,
               fontWeight: "600",
             }}
           />
