@@ -1,28 +1,37 @@
-
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 import os
+import pandas as pd
+import numpy as np
+from collections import Counter
 
-# Use relative imports if backend is a package
-# import models, schemas, crud, auth, ml_model
-# from .database import SessionLocal, engine  # no dot if in same folder
-from backend import models, schemas, crud, auth, ml_model
-from .database import SessionLocal, engine
+# CORRECTED IMPORTS: Since Render runs the app from the 'backend' directory,
+# we use direct imports instead of 'from backend import...' or relative imports.
+import models, schemas, crud, auth, ml_model
+from database import SessionLocal, engine
+
+# --- Configuration ---
+# Read API KEY from environment variable for security
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+
+# For security, best practice is to specify front-end domain in deployment (e.g., https://your-frontend.onrender.com)
+# Using "*" during initial testing allows the frontend on Vercel/Netlify to connect easily.
+ALLOWED_ORIGINS = ["*"] 
+
 
 # Initialize FastAPI app
 app = FastAPI(title="Heart Risk App")
 
 # Create database tables if they do not exist
+# This is safe to run on startup; SQLAlchemy checks if tables exist first.
 models.Base.metadata.create_all(bind=engine)
 
 # ------------------ CORS ------------------
-origins = ["http://localhost:3000"]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,6 +45,85 @@ def get_db():
     finally:
         db.close()
 
+# ------------------ ML/Data Preprocessing Functions ------------------
+
+def preprocess_cardio_data(df):
+    """
+    Comprehensive preprocessing for cardiovascular dataset
+    Converts categorical codes to meaningful real-life values
+    """
+    # Create a copy to avoid modifying original
+    df = df.copy()
+    
+    # Drop 'id' if present
+    if 'id' in df.columns:
+        df = df.drop(columns=['id'])
+    
+    # 1. AGE: Convert from days to years
+    df['age'] = (df['age'] / 365).round(1)
+    
+    # 2. GENDER: Convert to meaningful labels
+    df['gender_label'] = df['gender'].map({
+        1: "Female",
+        2: "Male"
+    })
+    
+    # 3. HEIGHT & WEIGHT: Remove outliers
+    df = df[(df['height'] >= 140) & (df['height'] <= 220)]
+    df = df[(df['weight'] >= 30) & (df['weight'] <= 200)]
+    
+    # Calculate BMI for additional insight
+    df['bmi'] = (df['weight'] / ((df['height'] / 100) ** 2)).round(1)
+    df['bmi_category'] = pd.cut(df['bmi'], 
+                                 bins=[0, 18.5, 25, 30, 100],
+                                 labels=['Underweight', 'Normal', 'Overweight', 'Obese'])
+    
+    # 4. BLOOD PRESSURE: Remove invalid values and create categories
+    df = df[(df['ap_hi'] >= 80) & (df['ap_hi'] <= 250)]
+    df = df[(df['ap_lo'] >= 40) & (df['ap_lo'] <= 150)]
+    df = df[df['ap_hi'] > df['ap_lo']]
+    
+    def categorize_bp(row):
+        if row['ap_hi'] < 120 and row['ap_lo'] < 80:
+            return 'Normal'
+        elif row['ap_hi'] < 130 and row['ap_lo'] < 80:
+            return 'Elevated'
+        elif row['ap_hi'] < 140 or row['ap_lo'] < 90:
+            return 'High BP Stage 1'
+        elif row['ap_hi'] < 180 or row['ap_lo'] < 120:
+            return 'High BP Stage 2'
+        else:
+            return 'Hypertensive Crisis'
+    
+    df['bp_category'] = df.apply(categorize_bp, axis=1)
+    
+    # 5. CHOLESTEROL
+    df['cholesterol_value'] = df['cholesterol'].map({1: 170, 2: 220, 3: 260})
+    df['cholesterol_label'] = df['cholesterol'].map({1: 'Normal (<200 mg/dL)', 2: 'Borderline High (200-239 mg/dL)', 3: 'High (≥240 mg/dL)'})
+    
+    # 6. GLUCOSE
+    df['glucose_value'] = df['gluc'].map({1: 90, 2: 110, 3: 150})
+    df['glucose_label'] = df['gluc'].map({1: 'Normal (<100 mg/dL)', 2: 'Prediabetes (100-125 mg/dL)', 3: 'Diabetes Range (≥126 mg/dL)'})
+    
+    # 7. LIFESTYLE FACTORS
+    df['smoking_status'] = df['smoke'].map({0: 'Non-Smoker', 1: 'Smoker'})
+    df['alcohol_status'] = df['alco'].map({0: 'No Alcohol', 1: 'Consumes Alcohol'})
+    df['activity_status'] = df['active'].map({0: 'Inactive', 1: 'Active'})
+    
+    # 8. CARDIO (Target)
+    df['cardio_status'] = df['cardio'].map({0: 'No Disease', 1: 'Has Disease'})
+    df['risk_percentage'] = df['cardio'].astype(float) * 100
+    
+    def categorize_risk(r):
+        if r > 70: return "High"
+        elif r > 40: return "Moderate"
+        else: return "Low"
+    
+    df['risk_category'] = df['risk_percentage'].apply(categorize_risk)
+    df['age_group'] = pd.cut(df['age'], bins=[0, 40, 50, 60, 100], labels=['Under 40', '40-50', '50-60', '60+'])
+    
+    return df
+
 # ------------------ Routes ------------------
 
 # Register
@@ -46,11 +134,8 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if crud.get_user_by_email(db, user.email):
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    created_user = crud.create_user(db, user)  # create the user first
-    #print("Created user:", created_user)
-    
+    created_user = crud.create_user(db, user)
     return created_user
-
 
 # Login (Token)
 @app.post("/token", response_model=schemas.Token)
@@ -86,150 +171,10 @@ def evaluate(eval_in: schemas.EvalIn,
 
     return {"risk": entry.risk, "recommendation": rec, "id": entry.id}
 
-import pandas as pd
-import numpy as np
-
-def preprocess_cardio_data(df):
-    """
-    Comprehensive preprocessing for cardiovascular dataset
-    Converts categorical codes to meaningful real-life values
-    """
-    # Create a copy to avoid modifying original
-    df = df.copy()
-    
-    # Drop 'id' if present
-    if 'id' in df.columns:
-        df = df.drop(columns=['id'])
-    
-    # 1. AGE: Convert from days to years
-    df['age'] = (df['age'] / 365).round(1)
-    
-    # 2. GENDER: Convert to meaningful labels
-    df['gender_label'] = df['gender'].map({
-        1: "Female",
-        2: "Male"
-    })
-    
-    # 3. HEIGHT: Keep in cm (already meaningful)
-    # Optionally remove outliers
-    df = df[(df['height'] >= 140) & (df['height'] <= 220)]
-    
-    # 4. WEIGHT: Keep in kg (already meaningful)
-    # Optionally remove outliers
-    df = df[(df['weight'] >= 30) & (df['weight'] <= 200)]
-    
-    # Calculate BMI for additional insight
-    df['bmi'] = (df['weight'] / ((df['height'] / 100) ** 2)).round(1)
-    df['bmi_category'] = pd.cut(df['bmi'], 
-                                 bins=[0, 18.5, 25, 30, 100],
-                                 labels=['Underweight', 'Normal', 'Overweight', 'Obese'])
-    
-    # 5. BLOOD PRESSURE: Remove invalid values and create categories
-    # Remove physiologically impossible values
-    df = df[(df['ap_hi'] >= 80) & (df['ap_hi'] <= 250)]
-    df = df[(df['ap_lo'] >= 40) & (df['ap_lo'] <= 150)]
-    df = df[df['ap_hi'] > df['ap_lo']]  # Systolic must be > Diastolic
-    
-    # Create blood pressure categories (based on medical standards)
-    def categorize_bp(row):
-        if row['ap_hi'] < 120 and row['ap_lo'] < 80:
-            return 'Normal'
-        elif row['ap_hi'] < 130 and row['ap_lo'] < 80:
-            return 'Elevated'
-        elif row['ap_hi'] < 140 or row['ap_lo'] < 90:
-            return 'High BP Stage 1'
-        elif row['ap_hi'] < 180 or row['ap_lo'] < 120:
-            return 'High BP Stage 2'
-        else:
-            return 'Hypertensive Crisis'
-    
-    df['bp_category'] = df.apply(categorize_bp, axis=1)
-    
-    # 6. CHOLESTEROL: Convert to real medical values (mg/dL)
-    # Based on standard medical ranges:
-    # 1 (Normal): < 200 mg/dL → average ~170 mg/dL
-    # 2 (Above Normal): 200-239 mg/dL → average ~220 mg/dL
-    # 3 (Well Above Normal): ≥ 240 mg/dL → average ~260 mg/dL
-    df['cholesterol_value'] = df['cholesterol'].map({
-        1: 170,  # Normal range
-        2: 220,  # Borderline high
-        3: 260   # High
-    })
-    
-    df['cholesterol_label'] = df['cholesterol'].map({
-        1: 'Normal (<200 mg/dL)',
-        2: 'Borderline High (200-239 mg/dL)',
-        3: 'High (≥240 mg/dL)'
-    })
-    
-    # 7. GLUCOSE: Convert to real medical values (mg/dL)
-    # Based on standard fasting blood sugar levels:
-    # 1 (Normal): < 100 mg/dL → average ~90 mg/dL
-    # 2 (Above Normal): 100-125 mg/dL (Prediabetes) → average ~110 mg/dL
-    # 3 (Well Above Normal): ≥ 126 mg/dL (Diabetes) → average ~150 mg/dL
-    df['glucose_value'] = df['gluc'].map({
-        1: 90,   # Normal
-        2: 110,  # Prediabetes
-        3: 150   # Diabetes range
-    })
-    
-    df['glucose_label'] = df['gluc'].map({
-        1: 'Normal (<100 mg/dL)',
-        2: 'Prediabetes (100-125 mg/dL)',
-        3: 'Diabetes Range (≥126 mg/dL)'
-    })
-    
-    # 8. SMOKING: Convert to meaningful labels
-    df['smoking_status'] = df['smoke'].map({
-        0: 'Non-Smoker',
-        1: 'Smoker'
-    })
-    
-    # 9. ALCOHOL: Convert to meaningful labels
-    df['alcohol_status'] = df['alco'].map({
-        0: 'No Alcohol',
-        1: 'Consumes Alcohol'
-    })
-    
-    # 10. PHYSICAL ACTIVITY: Convert to meaningful labels
-    df['activity_status'] = df['active'].map({
-        0: 'Inactive',
-        1: 'Active'
-    })
-    
-    # 11. CARDIO (Target): Convert to meaningful labels
-    df['cardio_status'] = df['cardio'].map({
-        0: 'No Disease',
-        1: 'Has Disease'
-    })
-    
-    # Create risk score as PERCENTAGE (0-100%) based on cardio
-    df['risk_percentage'] = df['cardio'].astype(float) * 100
-    
-    # Categorize risk
-    def categorize_risk(r):
-        if r > 70:
-            return "High"
-        elif r > 40:
-            return "Moderate"
-        else:
-            return "Low"
-    
-    df['risk_category'] = df['risk_percentage'].apply(categorize_risk)
-    
-    # Create age groups for better analysis
-    df['age_group'] = pd.cut(df['age'], 
-                              bins=[0, 40, 50, 60, 100],
-                              labels=['Under 40', '40-50', '50-60', '60+'])
-    
-    return df
-
-
-# Updated dashboard analysis endpoint
 @app.get("/dashboard-analysis")
 def dashboard_analysis():
-    # Load dataset
-    df = pd.read_csv("backend/cardio_train.csv")
+    # Load dataset. The path is relative to the backend directory on Render.
+    df = pd.read_csv("cardio_train.csv") # <-- Corrected path assuming file is in backend/
     
     # Preprocess dataset with comprehensive cleaning
     df = preprocess_cardio_data(df)
@@ -260,11 +205,10 @@ def dashboard_analysis():
                 "count": len(subset_male)
             })
     
-    line_data = {
-        "Female": line_data_female,
-        "Male": line_data_male
-    }
+    line_data = {"Female": line_data_female, "Male": line_data_male}
     
+    # ... [Rest of your analysis logic] ...
+
     # --- Pie chart: Risk distribution by Gender ---
     gender_risk = []
     for gender in ['Female', 'Male']:
@@ -281,63 +225,25 @@ def dashboard_analysis():
             })
     
     # --- Bar charts: Average feature VALUES per gender (for patients WITH disease) ---
-    # This shows actual health metrics for diseased patients
     bar_data = {}
     for gender in ['Female', 'Male']:
         subset = df[(df['gender_label'] == gender) & (df['cardio'] == 1)]
         if not subset.empty:
             bar_data[gender] = [
-                {
-                    "feature": "BMI",
-                    "value": float(subset['bmi'].mean()),
-                    "unit": "kg/m²"
-                },
-                {
-                    "feature": "Systolic BP",
-                    "value": float(subset['ap_hi'].mean()),
-                    "unit": "mmHg"
-                },
-                {
-                    "feature": "Diastolic BP",
-                    "value": float(subset['ap_lo'].mean()),
-                    "unit": "mmHg"
-                },
-                {
-                    "feature": "Cholesterol",
-                    "value": float(subset['cholesterol_value'].mean()),
-                    "unit": "mg/dL"
-                },
-                {
-                    "feature": "Glucose",
-                    "value": float(subset['glucose_value'].mean()),
-                    "unit": "mg/dL"
-                },
-                {
-                    "feature": "Age",
-                    "value": float(subset['age'].mean()),
-                    "unit": "years"
-                },
-                {
-                    "feature": "Smokers",
-                    "value": float((subset['smoke'].sum() / len(subset)) * 100),
-                    "unit": "%"
-                },
-                {
-                    "feature": "Alcohol Users",
-                    "value": float((subset['alco'].sum() / len(subset)) * 100),
-                    "unit": "%"
-                },
-                {
-                    "feature": "Physically Active",
-                    "value": float((subset['active'].sum() / len(subset)) * 100),
-                    "unit": "%"
-                }
+                {"feature": "BMI", "value": float(subset['bmi'].mean()), "unit": "kg/m²"},
+                {"feature": "Systolic BP", "value": float(subset['ap_hi'].mean()), "unit": "mmHg"},
+                {"feature": "Diastolic BP", "value": float(subset['ap_lo'].mean()), "unit": "mmHg"},
+                {"feature": "Cholesterol", "value": float(subset['cholesterol_value'].mean()), "unit": "mg/dL"},
+                {"feature": "Glucose", "value": float(subset['glucose_value'].mean()), "unit": "mg/dL"},
+                {"feature": "Age", "value": float(subset['age'].mean()), "unit": "years"},
+                {"feature": "Smokers", "value": float((subset['smoke'].sum() / len(subset)) * 100), "unit": "%"},
+                {"feature": "Alcohol Users", "value": float((subset['alco'].sum() / len(subset)) * 100), "unit": "%"},
+                {"feature": "Physically Active", "value": float((subset['active'].sum() / len(subset)) * 100), "unit": "%"}
             ]
         else:
             bar_data[gender] = []
     
     # --- Risk category distribution ---
-    from collections import Counter
     risk_summary = dict(Counter(df['risk_category']))
     
     # --- NEW: Age Group Analysis ---
@@ -384,7 +290,6 @@ def dashboard_analysis():
             })
     
     # --- NEW: Lifestyle Factors Impact ---
-    # Lifestyle Factors Impact
     lifestyle_impact = {}
 
     # Smoking
@@ -410,34 +315,33 @@ def dashboard_analysis():
         "active_disease_rate": float((active['cardio'].sum() / len(active)) * 100) if len(active) > 0 else 0,
         "inactive_disease_rate": float((inactive['cardio'].sum() / len(inactive)) * 100) if len(inactive) > 0 else 0
     }
-
     
     # --- NEW: Cholesterol & Glucose Analysis ---
     cholesterol_analysis = []
     for chol_level in [1, 2, 3]:
-            subset = df[df['cholesterol'] == chol_level]
-            if not subset.empty:
-                disease_count = subset[subset['cardio'] == 1].shape[0]
-                total_count = len(subset)
-                cholesterol_analysis.append({
-                    "level": int(chol_level),
-                    "label": subset['cholesterol_label'].iloc[0],
-                    "disease_percentage": float((disease_count / total_count) * 100),
-                    "total_patients": int(total_count)
-                })
+        subset = df[df['cholesterol'] == chol_level]
+        if not subset.empty:
+            disease_count = subset[subset['cardio'] == 1].shape[0]
+            total_count = len(subset)
+            cholesterol_analysis.append({
+                "level": int(chol_level),
+                "label": subset['cholesterol_label'].iloc[0],
+                "disease_percentage": float((disease_count / total_count) * 100),
+                "total_patients": int(total_count)
+            })
     
     glucose_analysis = []
     for gluc_level in [1, 2, 3]:
-            subset = df[df['gluc'] == gluc_level]
-            if not subset.empty:
-                disease_count = subset[subset['cardio'] == 1].shape[0]
-                total_count = len(subset)
-                glucose_analysis.append({
-                    "level": int(gluc_level),
-                    "label": subset['glucose_label'].iloc[0],
-                    "disease_percentage": float((disease_count / total_count) * 100),
-                    "total_patients": int(total_count)
-                })
+        subset = df[df['gluc'] == gluc_level]
+        if not subset.empty:
+            disease_count = subset[subset['cardio'] == 1].shape[0]
+            total_count = len(subset)
+            glucose_analysis.append({
+                "level": int(gluc_level),
+                "label": subset['glucose_label'].iloc[0],
+                "disease_percentage": float((disease_count / total_count) * 100),
+                "total_patients": int(total_count)
+            })
     
     # --- NEW: High-Risk Profile (patients with multiple risk factors) ---
     high_risk_profile = df[
@@ -463,7 +367,7 @@ def dashboard_analysis():
     }
     
     return {
-        "line_data": line_data,  # Now separated by gender
+        "line_data": line_data,
         "gender_risk": gender_risk,
         "bar_data": bar_data,
         "risk_summary": risk_summary,
@@ -476,7 +380,7 @@ def dashboard_analysis():
         "cholesterol_analysis": cholesterol_analysis,
         "glucose_analysis": glucose_analysis,
         "high_risk_profile": high_risk_stats
-      
+        
     }
 
 # ------------------ Gemini Chat ------------------
@@ -485,18 +389,34 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from google import genai
 
-client = genai.Client(api_key="AIzaSyDBW4pA39gSgkSW2i7uspqqcTCPYcwWIG4")  # replace with valid key
+# !!! SECURITY FIX: READ API KEY FROM ENVIRONMENT VARIABLE !!!
+API_KEY = os.environ.get("GEMINI_API_KEY")
+
+if not API_KEY:
+    # If key is missing, handle gracefully by printing a warning and setting client to None
+    print("Warning: GEMINI_API_KEY environment variable is not set. Chatbot functionality will be disabled.")
+    client = None
+else:
+    client = genai.Client(api_key=API_KEY)
 
 class ChatRequest(BaseModel):
     message: str
 
 @app.post("/chat")
 def chat(request: ChatRequest):
+    if not client:
+        raise HTTPException(status_code=503, detail="Chatbot service unavailable (API Key Missing)")
+        
     try:
+        # Use Google Search for grounded results
         response = client.models.generate_content(
             model="gemini-2.5-flash",
-            contents=request.message
+            contents=request.message,
+            tools=[{"google_search": {}}]
         )
+        # Assuming you want to display the generated text
         return {"answer": response.text}
     except Exception as e:
-        return {"error": str(e)}
+        print(f"Gemini API Error: {e}")
+        # Return a user-friendly error message
+        raise HTTPException(status_code=500, detail="Internal Chatbot Error processing request.")
