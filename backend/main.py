@@ -19,7 +19,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 # --- CORS FIX: Explicitly allowed domains for cross-origin requests ---
 # This list MUST include the exact Netlify domain to resolve the CORS block.
-NETLIFY_URL = "https://stunning-klepon-b4761c.netlify.app"
+NETLIFY_URL = "https://cardiocaree.netlify.app"
 RENDER_URL = "https://heart-attack-predictor-deploy.onrender.com"
 
 ALLOWED_ORIGINS = [
