@@ -1,0 +1,502 @@
+
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from fastapi.security import OAuth2PasswordRequestForm
+import os
+
+# Use relative imports if backend is a package
+# import models, schemas, crud, auth, ml_model
+# from .database import SessionLocal, engine  # no dot if in same folder
+from backend import models, schemas, crud, auth, ml_model
+from .database import SessionLocal, engine
+
+# Initialize FastAPI app
+app = FastAPI(title="Heart Risk App")
+
+# Create database tables if they do not exist
+models.Base.metadata.create_all(bind=engine)
+
+# ------------------ CORS ------------------
+origins = ["http://localhost:3000"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ------------------ DB Dependency ------------------
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# ------------------ Routes ------------------
+
+# Register
+@app.post("/register", response_model=schemas.UserOut)
+def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    print("Received registration request:", user)
+    
+    if crud.get_user_by_email(db, user.email):
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    created_user = crud.create_user(db, user)  # create the user first
+    #print("Created user:", created_user)
+    
+    return created_user
+
+
+# Login (Token)
+@app.post("/token", response_model=schemas.Token)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # form_data.username contains the email in our frontend
+    user = crud.authenticate_user(db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    
+    access_token = auth.create_access_token(data={"sub": user.email})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "is_medic": user.is_medic,
+        "user_id": user.id,
+        "name": user.name
+    }
+
+@app.post("/evaluate")
+def evaluate(eval_in: schemas.EvalIn,
+             current_user: models.User = Depends(auth.get_current_user),
+             db: Session = Depends(get_db)):
+    
+    if current_user.is_medic:
+        raise HTTPException(status_code=403, detail="Medics cannot submit evaluations")
+
+    entry = crud.create_evaluation(db, current_user.id, eval_in)
+    rec = "Low risk — maintain healthy lifestyle."
+    if entry.risk > 0.7:
+        rec = "High risk — consult a doctor immediately."
+    elif entry.risk > 0.4:
+        rec = "Moderate risk — increase exercise, monitor BP and cholesterol."
+
+    return {"risk": entry.risk, "recommendation": rec, "id": entry.id}
+
+import pandas as pd
+import numpy as np
+
+def preprocess_cardio_data(df):
+    """
+    Comprehensive preprocessing for cardiovascular dataset
+    Converts categorical codes to meaningful real-life values
+    """
+    # Create a copy to avoid modifying original
+    df = df.copy()
+    
+    # Drop 'id' if present
+    if 'id' in df.columns:
+        df = df.drop(columns=['id'])
+    
+    # 1. AGE: Convert from days to years
+    df['age'] = (df['age'] / 365).round(1)
+    
+    # 2. GENDER: Convert to meaningful labels
+    df['gender_label'] = df['gender'].map({
+        1: "Female",
+        2: "Male"
+    })
+    
+    # 3. HEIGHT: Keep in cm (already meaningful)
+    # Optionally remove outliers
+    df = df[(df['height'] >= 140) & (df['height'] <= 220)]
+    
+    # 4. WEIGHT: Keep in kg (already meaningful)
+    # Optionally remove outliers
+    df = df[(df['weight'] >= 30) & (df['weight'] <= 200)]
+    
+    # Calculate BMI for additional insight
+    df['bmi'] = (df['weight'] / ((df['height'] / 100) ** 2)).round(1)
+    df['bmi_category'] = pd.cut(df['bmi'], 
+                                 bins=[0, 18.5, 25, 30, 100],
+                                 labels=['Underweight', 'Normal', 'Overweight', 'Obese'])
+    
+    # 5. BLOOD PRESSURE: Remove invalid values and create categories
+    # Remove physiologically impossible values
+    df = df[(df['ap_hi'] >= 80) & (df['ap_hi'] <= 250)]
+    df = df[(df['ap_lo'] >= 40) & (df['ap_lo'] <= 150)]
+    df = df[df['ap_hi'] > df['ap_lo']]  # Systolic must be > Diastolic
+    
+    # Create blood pressure categories (based on medical standards)
+    def categorize_bp(row):
+        if row['ap_hi'] < 120 and row['ap_lo'] < 80:
+            return 'Normal'
+        elif row['ap_hi'] < 130 and row['ap_lo'] < 80:
+            return 'Elevated'
+        elif row['ap_hi'] < 140 or row['ap_lo'] < 90:
+            return 'High BP Stage 1'
+        elif row['ap_hi'] < 180 or row['ap_lo'] < 120:
+            return 'High BP Stage 2'
+        else:
+            return 'Hypertensive Crisis'
+    
+    df['bp_category'] = df.apply(categorize_bp, axis=1)
+    
+    # 6. CHOLESTEROL: Convert to real medical values (mg/dL)
+    # Based on standard medical ranges:
+    # 1 (Normal): < 200 mg/dL → average ~170 mg/dL
+    # 2 (Above Normal): 200-239 mg/dL → average ~220 mg/dL
+    # 3 (Well Above Normal): ≥ 240 mg/dL → average ~260 mg/dL
+    df['cholesterol_value'] = df['cholesterol'].map({
+        1: 170,  # Normal range
+        2: 220,  # Borderline high
+        3: 260   # High
+    })
+    
+    df['cholesterol_label'] = df['cholesterol'].map({
+        1: 'Normal (<200 mg/dL)',
+        2: 'Borderline High (200-239 mg/dL)',
+        3: 'High (≥240 mg/dL)'
+    })
+    
+    # 7. GLUCOSE: Convert to real medical values (mg/dL)
+    # Based on standard fasting blood sugar levels:
+    # 1 (Normal): < 100 mg/dL → average ~90 mg/dL
+    # 2 (Above Normal): 100-125 mg/dL (Prediabetes) → average ~110 mg/dL
+    # 3 (Well Above Normal): ≥ 126 mg/dL (Diabetes) → average ~150 mg/dL
+    df['glucose_value'] = df['gluc'].map({
+        1: 90,   # Normal
+        2: 110,  # Prediabetes
+        3: 150   # Diabetes range
+    })
+    
+    df['glucose_label'] = df['gluc'].map({
+        1: 'Normal (<100 mg/dL)',
+        2: 'Prediabetes (100-125 mg/dL)',
+        3: 'Diabetes Range (≥126 mg/dL)'
+    })
+    
+    # 8. SMOKING: Convert to meaningful labels
+    df['smoking_status'] = df['smoke'].map({
+        0: 'Non-Smoker',
+        1: 'Smoker'
+    })
+    
+    # 9. ALCOHOL: Convert to meaningful labels
+    df['alcohol_status'] = df['alco'].map({
+        0: 'No Alcohol',
+        1: 'Consumes Alcohol'
+    })
+    
+    # 10. PHYSICAL ACTIVITY: Convert to meaningful labels
+    df['activity_status'] = df['active'].map({
+        0: 'Inactive',
+        1: 'Active'
+    })
+    
+    # 11. CARDIO (Target): Convert to meaningful labels
+    df['cardio_status'] = df['cardio'].map({
+        0: 'No Disease',
+        1: 'Has Disease'
+    })
+    
+    # Create risk score as PERCENTAGE (0-100%) based on cardio
+    df['risk_percentage'] = df['cardio'].astype(float) * 100
+    
+    # Categorize risk
+    def categorize_risk(r):
+        if r > 70:
+            return "High"
+        elif r > 40:
+            return "Moderate"
+        else:
+            return "Low"
+    
+    df['risk_category'] = df['risk_percentage'].apply(categorize_risk)
+    
+    # Create age groups for better analysis
+    df['age_group'] = pd.cut(df['age'], 
+                              bins=[0, 40, 50, 60, 100],
+                              labels=['Under 40', '40-50', '50-60', '60+'])
+    
+    return df
+
+
+# Updated dashboard analysis endpoint
+@app.get("/dashboard-analysis")
+def dashboard_analysis():
+    # Load dataset
+    df = pd.read_csv("backend/cardio_train.csv")
+    
+    # Preprocess dataset with comprehensive cleaning
+    df = preprocess_cardio_data(df)
+    
+    # --- Line chart: Risk by Age (separate lines for Male and Female) ---
+    age_range = np.arange(df['age'].min(), df['age'].max() + 1)
+    line_data_female = []
+    line_data_male = []
+    
+    for age in age_range:
+        # Female data
+        subset_female = df[(df['age'] == age) & (df['gender_label'] == 'Female')]
+        if not subset_female.empty:
+            disease_rate = (subset_female['cardio'].sum() / len(subset_female)) * 100
+            line_data_female.append({
+                "age": float(age),
+                "risk_percentage": float(disease_rate),
+                "count": len(subset_female)
+            })
+        
+        # Male data
+        subset_male = df[(df['age'] == age) & (df['gender_label'] == 'Male')]
+        if not subset_male.empty:
+            disease_rate = (subset_male['cardio'].sum() / len(subset_male)) * 100
+            line_data_male.append({
+                "age": float(age),
+                "risk_percentage": float(disease_rate),
+                "count": len(subset_male)
+            })
+    
+    line_data = {
+        "Female": line_data_female,
+        "Male": line_data_male
+    }
+    
+    # --- Pie chart: Risk distribution by Gender ---
+    gender_risk = []
+    for gender in ['Female', 'Male']:
+        subset = df[df['gender_label'] == gender]
+        if not subset.empty:
+            disease_count = subset[subset['cardio'] == 1].shape[0]
+            total_count = subset.shape[0]
+            risk_percentage = (disease_count / total_count) * 100
+            gender_risk.append({
+                "gender_label": gender,
+                "risk_percentage": float(risk_percentage),
+                "disease_count": int(disease_count),
+                "total_count": int(total_count)
+            })
+    
+    # --- Bar charts: Average feature VALUES per gender (for patients WITH disease) ---
+    # This shows actual health metrics for diseased patients
+    bar_data = {}
+    for gender in ['Female', 'Male']:
+        subset = df[(df['gender_label'] == gender) & (df['cardio'] == 1)]
+        if not subset.empty:
+            bar_data[gender] = [
+                {
+                    "feature": "BMI",
+                    "value": float(subset['bmi'].mean()),
+                    "unit": "kg/m²"
+                },
+                {
+                    "feature": "Systolic BP",
+                    "value": float(subset['ap_hi'].mean()),
+                    "unit": "mmHg"
+                },
+                {
+                    "feature": "Diastolic BP",
+                    "value": float(subset['ap_lo'].mean()),
+                    "unit": "mmHg"
+                },
+                {
+                    "feature": "Cholesterol",
+                    "value": float(subset['cholesterol_value'].mean()),
+                    "unit": "mg/dL"
+                },
+                {
+                    "feature": "Glucose",
+                    "value": float(subset['glucose_value'].mean()),
+                    "unit": "mg/dL"
+                },
+                {
+                    "feature": "Age",
+                    "value": float(subset['age'].mean()),
+                    "unit": "years"
+                },
+                {
+                    "feature": "Smokers",
+                    "value": float((subset['smoke'].sum() / len(subset)) * 100),
+                    "unit": "%"
+                },
+                {
+                    "feature": "Alcohol Users",
+                    "value": float((subset['alco'].sum() / len(subset)) * 100),
+                    "unit": "%"
+                },
+                {
+                    "feature": "Physically Active",
+                    "value": float((subset['active'].sum() / len(subset)) * 100),
+                    "unit": "%"
+                }
+            ]
+        else:
+            bar_data[gender] = []
+    
+    # --- Risk category distribution ---
+    from collections import Counter
+    risk_summary = dict(Counter(df['risk_category']))
+    
+    # --- NEW: Age Group Analysis ---
+    age_group_analysis = []
+    for age_group in ['Under 40', '40-50', '50-60', '60+']:
+        subset = df[df['age_group'] == age_group]
+        if not subset.empty:
+            disease_count = subset[subset['cardio'] == 1].shape[0]
+            total_count = len(subset)
+            age_group_analysis.append({
+                "age_group": age_group,
+                "disease_percentage": float((disease_count / total_count) * 100),
+                "total_patients": int(total_count),
+                "diseased_patients": int(disease_count)
+            })
+    
+    # --- NEW: BMI Category Distribution ---
+    bmi_distribution = []
+    for bmi_cat in ['Underweight', 'Normal', 'Overweight', 'Obese']:
+        subset = df[df['bmi_category'] == bmi_cat]
+        if not subset.empty:
+            disease_count = subset[subset['cardio'] == 1].shape[0]
+            total_count = len(subset)
+            bmi_distribution.append({
+                "bmi_category": bmi_cat,
+                "disease_percentage": float((disease_count / total_count) * 100),
+                "total_patients": int(total_count),
+                "diseased_patients": int(disease_count)
+            })
+    
+    # --- NEW: Blood Pressure Category Analysis ---
+    bp_analysis = []
+    bp_categories = ['Normal', 'Elevated', 'High BP Stage 1', 'High BP Stage 2', 'Hypertensive Crisis']
+    for bp_cat in bp_categories:
+        subset = df[df['bp_category'] == bp_cat]
+        if not subset.empty:
+            disease_count = subset[subset['cardio'] == 1].shape[0]
+            total_count = len(subset)
+            bp_analysis.append({
+                "bp_category": bp_cat,
+                "disease_percentage": float((disease_count / total_count) * 100),
+                "total_patients": int(total_count),
+                "diseased_patients": int(disease_count)
+            })
+    
+    # --- NEW: Lifestyle Factors Impact ---
+    # Lifestyle Factors Impact
+    lifestyle_impact = {}
+
+    # Smoking
+    smokers = df[df['smoke'] == 1]
+    non_smokers = df[df['smoke'] == 0]
+    lifestyle_impact['smoking'] = {
+        "smokers_disease_rate": float((smokers['cardio'].sum() / len(smokers)) * 100) if len(smokers) > 0 else 0,
+        "non_smokers_disease_rate": float((non_smokers['cardio'].sum() / len(non_smokers)) * 100) if len(non_smokers) > 0 else 0
+    }
+
+    # Alcohol
+    drinkers = df[df['alco'] == 1]
+    non_drinkers = df[df['alco'] == 0]
+    lifestyle_impact['alcohol'] = {
+        "drinkers_disease_rate": float((drinkers['cardio'].sum() / len(drinkers)) * 100) if len(drinkers) > 0 else 0,
+        "non_drinkers_disease_rate": float((non_drinkers['cardio'].sum() / len(non_drinkers)) * 100) if len(non_drinkers) > 0 else 0
+    }
+
+    # Physical Activity
+    active = df[df['active'] == 1]
+    inactive = df[df['active'] == 0]
+    lifestyle_impact['physical_activity'] = {
+        "active_disease_rate": float((active['cardio'].sum() / len(active)) * 100) if len(active) > 0 else 0,
+        "inactive_disease_rate": float((inactive['cardio'].sum() / len(inactive)) * 100) if len(inactive) > 0 else 0
+    }
+
+    
+    # --- NEW: Cholesterol & Glucose Analysis ---
+    cholesterol_analysis = []
+    for chol_level in [1, 2, 3]:
+            subset = df[df['cholesterol'] == chol_level]
+            if not subset.empty:
+                disease_count = subset[subset['cardio'] == 1].shape[0]
+                total_count = len(subset)
+                cholesterol_analysis.append({
+                    "level": int(chol_level),
+                    "label": subset['cholesterol_label'].iloc[0],
+                    "disease_percentage": float((disease_count / total_count) * 100),
+                    "total_patients": int(total_count)
+                })
+    
+    glucose_analysis = []
+    for gluc_level in [1, 2, 3]:
+            subset = df[df['gluc'] == gluc_level]
+            if not subset.empty:
+                disease_count = subset[subset['cardio'] == 1].shape[0]
+                total_count = len(subset)
+                glucose_analysis.append({
+                    "level": int(gluc_level),
+                    "label": subset['glucose_label'].iloc[0],
+                    "disease_percentage": float((disease_count / total_count) * 100),
+                    "total_patients": int(total_count)
+                })
+    
+    # --- NEW: High-Risk Profile (patients with multiple risk factors) ---
+    high_risk_profile = df[
+        (df['cholesterol'] >= 2) |
+        (df['gluc'] >= 2) |
+        (df['bp_category'].isin(['High BP Stage 2', 'Hypertensive Crisis'])) |
+        (df['bmi'] >= 30) |
+        (df['smoke'] == 1)
+    ]
+    high_risk_stats = {
+        "total_high_risk": int(high_risk_profile.shape[0]),
+        "high_risk_percentage": float((high_risk_profile.shape[0] / len(df)) * 100),
+        "disease_rate_in_high_risk": float((high_risk_profile['cardio'].sum() / len(high_risk_profile)) * 100) if len(high_risk_profile) > 0 else 0
+    }
+    
+    # --- Additional statistics ---
+    stats = {
+        "total_patients": int(df.shape[0]),
+        "avg_age": float(df['age'].mean()),
+        "disease_prevalence_percentage": float((df['cardio'].sum() / len(df)) * 100),
+        "avg_bmi": float(df['bmi'].mean()),
+        "high_bp_percentage": float((df['bp_category'].isin(['High BP Stage 1', 'High BP Stage 2', 'Hypertensive Crisis']).sum() / len(df)) * 100)
+    }
+    
+    return {
+        "line_data": line_data,  # Now separated by gender
+        "gender_risk": gender_risk,
+        "bar_data": bar_data,
+        "risk_summary": risk_summary,
+        "statistics": stats,
+        # New comprehensive analytics
+        "age_group_analysis": age_group_analysis,
+        "bmi_distribution": bmi_distribution,
+        "bp_analysis": bp_analysis,
+        "lifestyle_impact": lifestyle_impact,
+        "cholesterol_analysis": cholesterol_analysis,
+        "glucose_analysis": glucose_analysis,
+        "high_risk_profile": high_risk_stats
+      
+    }
+
+# ------------------ Gemini Chat ------------------
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+from google import genai
+
+client = genai.Client(api_key="AIzaSyDBW4pA39gSgkSW2i7uspqqcTCPYcwWIG4")  # replace with valid key
+
+class ChatRequest(BaseModel):
+    message: str
+
+@app.post("/chat")
+def chat(request: ChatRequest):
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=request.message
+        )
+        return {"answer": response.text}
+    except Exception as e:
+        return {"error": str(e)}

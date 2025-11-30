@@ -1,0 +1,258 @@
+/* Berryshark Color Palette */
+:root {
+  /* -------- Rose-Berry Theme (Based on #BE6B84) -------- */
+  --berry-dark: #6A3A48;      /* Darkened version of #BE6B84 */
+  --berry-purple: #8C4F63;    /* Muted, slightly purple tint */
+  --berry-accent: #BE6B84;    /* Main brand color */
+  --berry-light: #DFA0B1;     /* Lighter pastel tone */
+  --berry-bg: #BE6B84;         /* Pink background color */
+
+  /* -------- Complementary Shark Gray Theme -------- */
+  --shark-dark: #2A2730;      /* Works with rose tones */
+  --shark-gray: #3A3642;      /* Slightly warm dark gray */
+
+  /* -------- Text Colors -------- */
+  --text-primary: #ffffff;
+  --text-secondary: #F5D9E0;  /* Soft text tint matching rose-berry */
+
+  /* -------- Borders & Hover -------- */
+  --border-color: #8E5F6F;    /* Subtle border tone */
+  --hover-bg: #A85A70;        /* Slightly darker than accent */
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.navbar {
+  background-color: var(--shark-dark);
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  width: 100%;
+}
+
+.navbar-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  max-width: 100%;
+  gap: 1.5rem;
+}
+
+/* Logo Section */
+.navbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-shrink: 0;
+}
+
+.logo-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--berry-purple), var(--berry-accent));
+  border-radius: 8px;
+  color: var(--text-primary);
+  border: 2px solid var(--berry-accent);
+}
+
+.logo-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.logo-pipe {
+  display: inline-block;
+  width: 2px;         /* thickness of the pipe */
+  height: 29px;       /* height of the pipe */
+  background-color: var(--text-primary); /* color of the pipe */
+  margin-left: 8px;   /* space from the text */
+  vertical-align: middle;
+}
+
+/* Right Actions */
+.navbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.plan-badge {
+  background-color: var(--shark-gray);
+  color: var(--text-secondary);
+  font-size: 0.813rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--berry-purple), var(--berry-accent));
+  border: 2px solid var(--berry-accent);
+  border-radius: 50%;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-avatar:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 3px rgba(124, 92, 191, 0.2);
+}
+
+.upgrade-btn {
+  background: linear-gradient(135deg, var(--berry-accent), var(--berry-light));
+  color: var(--text-primary);
+  border: none;
+  padding: 0.625rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.upgrade-btn:hover {
+  background: linear-gradient(135deg, var(--berry-light), var(--berry-accent));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(156, 48, 138, 0.3);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .navbar-container {
+    padding: 0.75rem 1rem;
+    gap: 1rem;
+  }
+
+  .plan-badge {
+    display: none;
+  }
+
+  .logo-text {
+    font-size: 1.125rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .navbar-search {
+    max-width: 200px;
+  }
+
+  .search-input::placeholder {
+    content: 'Search';
+  }
+
+  .upgrade-btn {
+    padding: 0.5rem 0.875rem;
+    font-size: 0.813rem;
+  }
+}
+
+.avatar-container {
+  position: relative;
+}
+
+.user-avatar {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.avatar-menu {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  width: 180px;
+  background: #2e2440;
+  border: 1px solid #443a57;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+  z-index: 20;
+}
+
+.menu-user {
+  font-size: 14px;
+  color: #fff;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #444;
+  margin-bottom: 8px;
+}
+
+.menu-item {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 10px;
+  text-align: left;
+  color: #ddd;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.menu-item:hover {
+  background: #3b2f50;
+}
+
+.logout {
+  color: #ff6b81;
+}
+
+.navbar-links {
+  display: inline-flex;
+  gap: 20px; /* space between links */
+  margin-left: 16px; /* space after the pipe */
+  align-items: center;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: var(--text-primary);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.nav-link:hover {
+  color: var(--hover-bg);
+}
