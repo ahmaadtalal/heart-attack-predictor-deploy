@@ -9,7 +9,7 @@ from collections import Counter
 from google.genai import Client
 
 from pydantic import BaseModel
-from . import models, schemas, crud, auth, ml_model
+import models, schemas, crud, auth, ml_model
 
 # CORRECTED IMPORTS: Since Render runs the app from the 'backend' directory,
 # we use direct imports instead of 'from backend import...' or relative imports.
