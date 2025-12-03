@@ -13,8 +13,8 @@ import models, schemas, crud, auth, ml_model
 
 # CORRECTED IMPORTS: Since Render runs the app from the 'backend' directory,
 # we use direct imports instead of 'from backend import...' or relative imports.
-from . import models, schemas, crud, auth, ml_model
-from .database import SessionLocal, engine
+import models, schemas, crud, auth, ml_model
+from database import SessionLocal, engine
 from google import genai
 
 # --- Configuration ---
