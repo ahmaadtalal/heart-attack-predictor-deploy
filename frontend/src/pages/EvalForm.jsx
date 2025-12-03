@@ -23,11 +23,6 @@ export default function EvalForm({ userName, onLogout }) {
     if (isMedic) navigate("/dashboard");
   }, [isMedic, navigate]);
 
-  useEffect(() => {
-    document.title = "CardioCare | Self Evaluation";
-    setAnimate(true);
-  }, []);
-
   const [form, setForm] = useState({
     age: 30,
     gender: 1,
@@ -46,14 +41,53 @@ export default function EvalForm({ userName, onLogout }) {
     setAnimate(true);
   }, []);
 
+  useEffect(() => {
+    document.title = "CardioCare | Self Evaluation";
+    setAnimate(true);
+  }, []);
+
   const animatedStyle = (delay = 0) => ({
     opacity: animate ? 1 : 0,
     transform: animate ? "translateY(0)" : "translateY(30px)",
     transition: `opacity 0.8s ease-out ${delay}s, transform 0.8s ease-out ${delay}s`,
   });
 
+  const validateForm = () => {
+    // AGE
+    if (form.age < 0) return "Age cannot be negative.";
+    if (form.age > 100) return "Age cannot be greater than 100.";
+
+    if (form.weight < 0) return "Weight cannot be negative.";
+    if (form.weight > 190) return "Weight cannot be greater than 190 kg.";
+
+    if (form.cholesterol < 0) return "Cholesterol cannot be negative.";
+    if (form.cholesterol > 260)
+      return "Cholesterol must be less than 260 mg/dL. A value > 200 is considered high.";
+    if (form.cholesterol === 0)
+      return "Please enter a non-zero cholesterol value.";
+
+    if (form.ap_hi < 0) return "Systolic BP cannot be negative.";
+    if (form.ap_hi < 50) return "Systolic BP (AP High) cannot be below 50.";
+    if (form.ap_hi > 200)
+      return "Systolic BP (AP High) cannot be greater than 200.";
+
+    if (form.ap_lo < 0) return "Diastolic BP cannot be negative.";
+    if (form.ap_lo < 33) return "Diastolic BP (AP Low) cannot be below 33.";
+    if (form.ap_lo > 150)
+      return "Diastolic BP (AP Low) cannot be greater than 150.";
+
+    return null;
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+
+    const error = validateForm();
+    if (error) {
+      alert(error);
+      return;
+    }
+
     try {
       const res = await predict(form, token);
       setResult(res);
@@ -143,6 +177,7 @@ export default function EvalForm({ userName, onLogout }) {
                 <label>Age</label>
                 <input
                   type="number"
+                  min="0"
                   value={form.age}
                   onChange={(e) =>
                     setForm({ ...form, age: Number(e.target.value) })
@@ -169,6 +204,7 @@ export default function EvalForm({ userName, onLogout }) {
                 <label>Weight (kg)</label>
                 <input
                   type="number"
+                  min="0"
                   value={form.weight}
                   onChange={(e) =>
                     setForm({ ...form, weight: Number(e.target.value) })
@@ -181,6 +217,7 @@ export default function EvalForm({ userName, onLogout }) {
                 <label>Cholesterol</label>
                 <input
                   type="number"
+                  min="0"
                   value={form.cholesterol}
                   onFocus={() =>
                     form.cholesterol === 0 &&
@@ -197,6 +234,7 @@ export default function EvalForm({ userName, onLogout }) {
                 <label>AP High (Systolic BP)</label>
                 <input
                   type="number"
+                  min="0"
                   value={form.ap_hi}
                   onFocus={() =>
                     form.ap_hi === 0 && setForm({ ...form, ap_hi: "" })
@@ -212,6 +250,7 @@ export default function EvalForm({ userName, onLogout }) {
                 <label>AP Low (Diastolic BP)</label>
                 <input
                   type="number"
+                  min="0"
                   value={form.ap_lo}
                   onFocus={() =>
                     form.ap_lo === 0 && setForm({ ...form, ap_lo: "" })
@@ -252,20 +291,6 @@ export default function EvalForm({ userName, onLogout }) {
               </div>
             </form>
 
-            {/* <button
-              type="submit"
-              onClick={submit}
-              style={{
-                ...buttonStyle,
-                marginTop: "20px",
-                opacity: animate ? 1 : 0,
-                transform: animate ? "translateY(0)" : "translateY(20px)",
-              }}
-              onMouseEnter={(e) => hoverIn(e)}
-              onMouseLeave={(e) => hoverOut(e)}
-            >
-              Check Risk
-            </button> */}
             <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
               <button
                 type="submit"
@@ -347,7 +372,6 @@ export default function EvalForm({ userName, onLogout }) {
 
 const inputWrapper = { display: "flex", flexDirection: "column" };
 
-/* NEW unified styling for inputs + number arrow removal */
 const inputStyle = {
   padding: "10px 12px",
   borderRadius: "8px",
@@ -358,13 +382,10 @@ const inputStyle = {
   color: "white",
   marginTop: "5px",
   appearance: "none",
-
-  /* removes number arrows (Chrome, Edge, Opera) */
   WebkitAppearance: "none",
   MozAppearance: "textfield",
 };
 
-/* Dropdowns match the same input style */
 const selectStyle = {
   ...inputStyle,
   appearance: "none",
