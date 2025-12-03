@@ -76,6 +76,15 @@ export default function History({ userName }) {
     fetchHistory();
   }, [token, navigate]);
 
+  // FIX: Add the missing state declaration here
+  const [, setAnimate] = useState(false);
+
+  // The original useEffect hook is now correctly referencing the setter
+  useEffect(() => {
+    document.title = "CardioCare | History";
+    setAnimate(true);
+  }, []);
+
   if (loading) return <p>Loading history...</p>;
   if (error) return <p style={{ color: "red" }}>{error}</p>;
   if (!history.length) return <p>No evaluations found.</p>;
@@ -373,7 +382,7 @@ export default function History({ userName }) {
               );
             }}
           />
-          <YAxis tick={{ fill: "#fff" }}/>
+          <YAxis tick={{ fill: "#fff" }} />
           <Tooltip
             formatter={(value, name) => [value, name]}
             labelFormatter={(label, idx) => history[idx]?.dateLabel || label}
@@ -386,7 +395,7 @@ export default function History({ userName }) {
       <h3 style={{ marginTop: "30px" }}>Blood Pressure Over Time</h3>
       <ResponsiveContainer width="100%" height={400}>
         <LineChart data={history}>
-          <CartesianGrid stroke="#8181817e"   strokeDasharray="3 3" />
+          <CartesianGrid stroke="#8181817e" strokeDasharray="3 3" />
 
           <XAxis
             dataKey="xDay"
@@ -406,7 +415,7 @@ export default function History({ userName }) {
               );
             }}
           />
-          <YAxis tick={{ fill: "#fff" }}/>
+          <YAxis tick={{ fill: "#fff" }} />
           <Tooltip
             formatter={(value, name) => [value, name]}
             labelFormatter={(label, idx) => history[idx]?.dateLabel || label}

@@ -1,11 +1,19 @@
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import "./HealthGuide.css";
 // import NavbarUser from "../NavbarUser/NavbarUser";
-import BackToTopButton from "../BackToTopButton.tsx"
+import BackToTopButton from "../BackToTopButton.tsx";
 
 export default function HealthGuide({ userName, onLogout }) {
+  // FIX: Add the missing state declaration here
+  const [, setAnimate] = useState(false);
+
+  // The original useEffect hook is now correctly referencing the setter
+  useEffect(() => {
+    document.title = "CardioCare | Cardio Guide";
+    setAnimate(true);
+  }, []);
   const lowRef = useRef(null);
   const mediumRef = useRef(null);
   const highRef = useRef(null);
@@ -34,9 +42,18 @@ export default function HealthGuide({ userName, onLogout }) {
       <h1>Heart Risk — Full Cardio Health Guide</h1>
 
       <div className="risk-buttons">
-        <button className="btn-low" onClick={() => scrollToSection(lowRef)}>Low Risk</button>
-        <button className="btn-medium" onClick={() => scrollToSection(mediumRef)}>Medium Risk</button>
-        <button className="btn-high" onClick={() => scrollToSection(highRef)}>High Risk</button>
+        <button className="btn-low" onClick={() => scrollToSection(lowRef)}>
+          Low Risk
+        </button>
+        <button
+          className="btn-medium"
+          onClick={() => scrollToSection(mediumRef)}
+        >
+          Medium Risk
+        </button>
+        <button className="btn-high" onClick={() => scrollToSection(highRef)}>
+          High Risk
+        </button>
       </div>
 
       <BackToTopButton />
@@ -167,7 +184,6 @@ export default function HealthGuide({ userName, onLogout }) {
   );
 }
 
-
 /* --------------------------------------
    SECTION COMPONENT (No navbar here)
 --------------------------------------- */
@@ -222,7 +238,9 @@ const Section = ({
       <div className="exercise-section">
         {exercises.map((ex, i) => (
           <div className="exercise-card" key={i}>
-            <div><strong>{ex.name}</strong></div>
+            <div>
+              <strong>{ex.name}</strong>
+            </div>
 
             <div className="image-placeholder">
               <img src={exerciseImages[i]} alt={ex.name} />

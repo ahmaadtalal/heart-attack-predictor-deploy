@@ -19,6 +19,12 @@ export default function ChatBot({ userName, onLogout }) {
   const streamRef = useRef(null); // <-- interval reference
 
   useEffect(() => setAnimate(true), []);
+
+  useEffect(() => {
+    document.title = "CardioCare | CardioBot";
+    setAnimate(true);
+  }, []);
+
   useEffect(
     () => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }),
     [log, partialBotMsg]
@@ -160,8 +166,21 @@ export default function ChatBot({ userName, onLogout }) {
           }}
         >
           {/* Header */}
-          <div style={{ textAlign: "center", marginBottom: "10px", ...animatedStyle(0.3) }}>
-            <h2 style={{ color: "white", fontWeight: 500, fontSize: "28px", margin: 0 }}>
+          <div
+            style={{
+              textAlign: "center",
+              marginBottom: "10px",
+              ...animatedStyle(0.3),
+            }}
+          >
+            <h2
+              style={{
+                color: "white",
+                fontWeight: 500,
+                fontSize: "28px",
+                margin: 0,
+              }}
+            >
               CardioBot
             </h2>
           </div>

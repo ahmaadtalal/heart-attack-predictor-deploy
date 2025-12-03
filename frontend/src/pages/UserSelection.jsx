@@ -17,6 +17,11 @@ export default function UserSelection({ userName, isMedic }) {
     };
   }, []);
 
+  useEffect(() => {
+    document.title = "CardioCare | Selection";
+    setAnimate(true);
+  }, []);
+
   const animatedStyle = (delay = 0) => ({
     opacity: animate ? 1 : 0,
     transform: animate ? "translateY(0)" : "translateY(40px)",
@@ -96,7 +101,13 @@ export default function UserSelection({ userName, isMedic }) {
               animation: "heartbeat 2s infinite ease-in-out",
             }}
           />
-          <h2 style={{ fontWeight: "600", letterSpacing: "1px", fontSize: "25px" }}>
+          <h2
+            style={{
+              fontWeight: "600",
+              letterSpacing: "1px",
+              fontSize: "25px",
+            }}
+          >
             CardioCare
           </h2>
         </div>
@@ -160,7 +171,6 @@ export default function UserSelection({ userName, isMedic }) {
               onClick={() => navigate("/medic-dashboard")}
             />
           )}
-
         </div>
 
         {/* Footer */}
@@ -200,7 +210,8 @@ export default function UserSelection({ userName, isMedic }) {
             <div>
               <h4 style={{ marginBottom: "6px" }}>80% Preventable</h4>
               <p style={{ color: "#F4C9D4" }}>
-                Most heart diseases can be prevented with early lifestyle changes.
+                Most heart diseases can be prevented with early lifestyle
+                changes.
               </p>
             </div>
             <div>

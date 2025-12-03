@@ -44,6 +44,15 @@ const ChartCard = ({ title, children, width = 950, style = {} }) => (
 );
 
 export default function Dashboard({ userName, onLogout }) {
+  // FIX: Add the missing state declaration here
+  const [, setAnimate] = useState(false);
+
+  // The original useEffect hook is now correctly referencing the setter
+  useEffect(() => {
+    document.title = "CardioCare | Dashboard";
+    setAnimate(true);
+  }, []);
+
   // Use REACT_APP_API_URL from the environment variable (used by axios)
   const API_ENDPOINT = process.env.REACT_APP_API_URL;
   const token = localStorage.getItem("token");

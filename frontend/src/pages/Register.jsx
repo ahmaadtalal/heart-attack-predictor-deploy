@@ -10,6 +10,11 @@ export default function Register({ role }) {
   const [error, setError] = useState("");
   const [animate, setAnimate] = useState(false);
 
+  // The original useEffect hook is now correctly referencing the setter
+  useEffect(() => {
+    document.title = "CardioCare | Register";
+    setAnimate(true);
+  }, []);
   useEffect(() => {
     setAnimate(true);
     // Remove scroll & white space

@@ -23,6 +23,11 @@ export default function EvalForm({ userName, onLogout }) {
     if (isMedic) navigate("/dashboard");
   }, [isMedic, navigate]);
 
+  useEffect(() => {
+    document.title = "CardioCare | Self Evaluation";
+    setAnimate(true);
+  }, []);
+
   const [form, setForm] = useState({
     age: 30,
     gender: 1,
@@ -247,8 +252,6 @@ export default function EvalForm({ userName, onLogout }) {
               </div>
             </form>
 
-
-
             {/* <button
               type="submit"
               onClick={submit}
@@ -289,7 +292,6 @@ export default function EvalForm({ userName, onLogout }) {
                 View History
               </button>
             </div>
-
 
             {result && (
               <div

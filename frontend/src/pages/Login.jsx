@@ -22,6 +22,11 @@ export default function Login({
     document.body.style.overflow = "hidden"; // no scrollbars
   }, []);
 
+  useEffect(() => {
+    document.title = "CardioCare | Login";
+    setAnimate(true);
+  }, []);
+
   const animatedStyle = (delay = 0) => ({
     opacity: animate ? 1 : 0,
     transform: animate ? "translateY(0)" : "translateY(30px)",
