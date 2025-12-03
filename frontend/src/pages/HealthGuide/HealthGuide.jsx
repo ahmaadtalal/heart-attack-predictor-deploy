@@ -3,6 +3,7 @@ import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
 import "./HealthGuide.css";
 // import NavbarUser from "../NavbarUser/NavbarUser";
+import BackToTopButton from "../BackToTopButton.tsx"
 
 export default function HealthGuide({ userName, onLogout }) {
   const lowRef = useRef(null);
@@ -37,6 +38,8 @@ export default function HealthGuide({ userName, onLogout }) {
         <button className="btn-medium" onClick={() => scrollToSection(mediumRef)}>Medium Risk</button>
         <button className="btn-high" onClick={() => scrollToSection(highRef)}>High Risk</button>
       </div>
+
+      <BackToTopButton />
 
       {/* LOW SECTION */}
       <Section

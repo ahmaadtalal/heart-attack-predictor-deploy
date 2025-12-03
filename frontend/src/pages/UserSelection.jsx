@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import dashoreval from "../Assets/dashoreval.jpg";
 import heartLogo1 from "../Assets/heartLogo1.png";
 
-export default function UserSelection() {
+export default function UserSelection({ userName, isMedic }) {
   const navigate = useNavigate();
   const [animate, setAnimate] = useState(false);
 
@@ -90,22 +90,22 @@ export default function UserSelection() {
             src={heartLogo1}
             alt="logo"
             style={{
-              width: "70px",
-              height: "70px",
+              width: "55px",
+              height: "55px",
               filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.6))",
               animation: "heartbeat 2s infinite ease-in-out",
             }}
           />
-          <h2 style={{ fontWeight: "600", letterSpacing: "1px" }}>
+          <h2 style={{ fontWeight: "600", letterSpacing: "1px", fontSize: "25px" }}>
             CardioCare
           </h2>
         </div>
 
         <h1
           style={{
-            marginBottom: "40px",
-            marginTop: "50px",
-            fontSize: "40px",
+            marginBottom: "20px",
+            marginTop: "40px",
+            fontSize: "30px",
             fontFamily: "geneo-sans, sans-serif",
             letterSpacing: "2px",
             ...animatedStyle(0.2),
@@ -118,10 +118,12 @@ export default function UserSelection() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, 380px)",
+            justifyContent: "center",
             gap: "30px",
-            maxWidth: "900px",
+            maxWidth: "800px",
             margin: "0 auto",
+            fontSize: "14px",
             ...animatedStyle(0.4),
           }}
         >
@@ -130,21 +132,35 @@ export default function UserSelection() {
             desc="Visualize patterns, correlations, and predictions through interactive charts and summary panels."
             onClick={() => navigate("/dashboard")}
           />
-          <Card
-            title="Self Evaluation Form"
-            desc="Input your medical details and instantly receive your personalized heart-risk score."
-            onClick={() => navigate("/eval")}
-          />
+
+          {!isMedic && (
+            <Card
+              title="Self Evaluation Form"
+              desc="Input your medical details and instantly receive your personalized heart-risk score."
+              onClick={() => navigate("/eval")}
+            />
+          )}
+
           <Card
             title="AI Health Chatbot"
             desc="Ask questions, understand results, and receive instant preventive heart-health insights."
             onClick={() => navigate("/chat")}
           />
+
           <Card
             title="Cardio Health Guide"
             desc="Explore heart-healthy routines, diet tips, and lifestyle changes recommended for long-term wellness."
             onClick={() => navigate("/health-guide")}
           />
+
+          {isMedic && (
+            <Card
+              title="User Trend Analysis"
+              desc="Analyze current app user trends, monitor activity patterns, and gain actionable insights."
+              onClick={() => navigate("/medic-dashboard")}
+            />
+          )}
+
         </div>
 
         {/* Footer */}
@@ -153,13 +169,13 @@ export default function UserSelection() {
             width: "100%",
             backgroundColor: "#4d092325",
             color: "white",
-            padding: "26px 20px",
-            marginTop: "auto",
+            padding: "5px 15px",
+            marginTop: "20px",
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
             gap: "60px",
-            fontSize: "15px",
+            fontSize: "12px",
             borderTop: "1px solid #4e1829e0",
             flexWrap: "wrap",
             textAlign: "center",
@@ -184,8 +200,7 @@ export default function UserSelection() {
             <div>
               <h4 style={{ marginBottom: "6px" }}>80% Preventable</h4>
               <p style={{ color: "#F4C9D4" }}>
-                Most heart diseases can be prevented with early lifestyle
-                changes.
+                Most heart diseases can be prevented with early lifestyle changes.
               </p>
             </div>
             <div>
@@ -228,8 +243,8 @@ function Card({ title, desc, onClick }) {
         e.currentTarget.style.boxShadow = "#be6b84d6";
       }}
     >
-      <h2 style={{ marginBottom: "12px", fontSize: "22px" }}>{title}</h2>
-      <p style={{ fontSize: "16px", opacity: 0.9 }}>{desc}</p>
+      <h2 style={{ marginBottom: "12px", fontSize: "18px" }}>{title}</h2>
+      <p style={{ fontSize: "14px", opacity: 0.9 }}>{desc}</p>
     </div>
   );
 }

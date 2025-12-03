@@ -247,7 +247,9 @@ export default function EvalForm({ userName, onLogout }) {
               </div>
             </form>
 
-            <button
+
+
+            {/* <button
               type="submit"
               onClick={submit}
               style={{
@@ -260,7 +262,34 @@ export default function EvalForm({ userName, onLogout }) {
               onMouseLeave={(e) => hoverOut(e)}
             >
               Check Risk
-            </button>
+            </button> */}
+            <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+              <button
+                type="submit"
+                onClick={submit}
+                style={buttonStyle}
+                onMouseEnter={(e) => hoverIn(e)}
+                onMouseLeave={(e) => hoverOut(e)}
+              >
+                Check Risk
+              </button>
+
+              <button
+                onClick={() => navigate("/history")}
+                style={{ ...buttonStyle, backgroundColor: "#6B8E23" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "scale(1.05)";
+                  e.currentTarget.style.backgroundColor = "#556B2F";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.backgroundColor = "#6B8E23";
+                }}
+              >
+                View History
+              </button>
+            </div>
+
 
             {result && (
               <div

@@ -1,135 +1,3 @@
-// import React, { useState, useEffect } from "react";
-// import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-
-// import Landing from "./pages/Landing";
-// import Login from "./pages/Login";
-// import Register from "./pages/Register";
-// import Dashboard from "./pages/Dashboard";
-// import EvalForm from "./pages/EvalForm";
-// import ChatBot from "./pages/ChatBot";
-// import HealthGuide from "./pages/HealthGuide/HealthGuide";
-// import UserSelection from "./pages/UserSelection";
-
-// export default function App() {
-//   const [isLoggedIn, setIsLoggedIn] = useState(false);
-//   const [isMedic, setIsMedic] = useState(false);
-//   const [userName, setUserName] = useState("");
-
-//   useEffect(() => {
-//     const token = localStorage.getItem("token");
-//     const medic = localStorage.getItem("is_medic");
-//     const name = localStorage.getItem("user_name");
-//     if (token) {
-//       setIsLoggedIn(true);
-//       setIsMedic(medic === "true");
-//       setUserName(name);
-//     }
-//   }, []);
-
-//   const handleLogout = () => {
-//     localStorage.clear();
-//     setIsLoggedIn(false);
-//     setIsMedic(false);
-//     setUserName("");
-//   };
-
-//   return (
-//     <BrowserRouter>
-//       <div>
-//         <Routes>
-//           {/* Landing page */}
-//           <Route path="/" element={<Landing />} />
-
-//           {/* User routes */}
-//           <Route
-//             path="/user/login"
-//             element={
-//               <Login
-//                 role="user"
-//                 setIsLoggedIn={setIsLoggedIn}
-//                 setIsMedic={setIsMedic}
-//                 setUserName={setUserName}
-//               />
-//             }
-//           />
-//           <Route path="/user/register" element={<Register role="user" />} />
-
-//           {/* UserSelection only for non-medic users */}
-//           <Route
-//             path="/userselection"
-//             element={
-//               isLoggedIn && !isMedic ? (
-//                 <UserSelection userName={userName} onLogout={handleLogout} />
-//               ) : (
-//                 <Navigate to="/" />
-//               )
-//             }
-//           />
-
-//           <Route
-//             path="/eval"
-//             element={
-//               isLoggedIn && !isMedic ? (
-//                 <EvalForm userName={userName} onLogout={handleLogout} />
-//               ) : (
-//                 <Navigate to="/" />
-//               )
-//             }
-//           />
-
-//           {/* Medic routes */}
-//           <Route
-//             path="/medic/login"
-//             element={
-//               <Login
-//                 role="medic"
-//                 setIsLoggedIn={setIsLoggedIn}
-//                 setIsMedic={setIsMedic}
-//                 setUserName={setUserName}
-//               />
-//             }
-//           />
-//           <Route path="/medic/register" element={<Register role="medic" />} />
-
-//           <Route
-//             path="/dashboard"
-//             element={
-//               isLoggedIn ? (
-//                 <Dashboard userName={userName} onLogout={handleLogout} />
-//               ) : (
-//                 <Navigate to="/" />
-//               )
-//             }
-//           />
-
-//           {/* Chat & HealthGuide */}
-//           <Route
-//             path="/chat"
-//             element={
-//               isLoggedIn ? (
-//                 <ChatBot userName={userName} onLogout={handleLogout} />
-//               ) : (
-//                 <Navigate to="/" />
-//               )
-//             }
-//           />
-//           <Route
-//             path="/health-guide"
-//             element={
-//               isLoggedIn ? (
-//                 <HealthGuide userName={userName} onLogout={handleLogout} />
-//               ) : (
-//                 <Navigate to="/" />
-//               )
-//             }
-//           />
-//         </Routes>
-//       </div>
-//     </BrowserRouter>
-//   );
-// }
-
-// Global Navbar
 import React, { useState, useEffect } from "react";
 import {
   BrowserRouter,
@@ -148,6 +16,8 @@ import EvalForm from "./pages/EvalForm";
 import ChatBot from "./pages/ChatBot";
 import HealthGuide from "./pages/HealthGuide/HealthGuide";
 import UserSelection from "./pages/UserSelection";
+import History from "./pages/History"; // <-- Add this
+import MedicDashboard from "./pages/MedicDashboard"; // adjust path if needed
 
 function AppWrapper() {
   return (
@@ -198,6 +68,7 @@ function App() {
           isMedic={isMedic}
           userName={userName}
           onLogout={handleLogout}
+          role={isMedic ? "medic" : "user"} // <-- ADD THIS LINE
         />
       )}
 
@@ -233,31 +104,37 @@ function App() {
         />
         <Route path="/medic/register" element={<Register role="medic" />} />
 
-        {/* ---------------- User Only Routes ---------------- */}
+        {/* ---------------- UserSelection (available for all) ---------------- */}
+        <Route
+          path="/userselection"
+          element={
+            isLoggedIn ? (
+              <UserSelection userName={userName} isMedic={isMedic} />
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+
+        {/* ---------------- EvalForm for users only ---------------- */}
         {!isMedic && (
-          <>
-            <Route
-              path="/userselection"
-              element={
-                isLoggedIn ? (
-                  <UserSelection userName={userName} /> // Navbar hidden
-                ) : (
-                  <Navigate to="/" />
-                )
-              }
-            />
-            <Route
-              path="/eval"
-              element={
-                isLoggedIn ? (
-                  <EvalForm userName={userName} /> // Navbar visible
-                ) : (
-                  <Navigate to="/" />
-                )
-              }
-            />
-          </>
+          <Route
+            path="/eval"
+            element={
+              isLoggedIn ? (
+                <EvalForm userName={userName} /> // Navbar visible
+              ) : (
+                <Navigate to="/" />
+              )
+            }
+          />
         )}
+        <Route
+          path="/history"
+          element={
+            isLoggedIn ? <History userName={userName} /> : <Navigate to="/" />
+          }
+        />
 
         {/* ---------------- Common Routes (User + Medic) ---------------- */}
         <Route
@@ -282,6 +159,8 @@ function App() {
             )
           }
         />
+        {/* NEW: Medic Dashboard route */}
+        <Route path="/medic-dashboard" element={<MedicDashboard />} />
       </Routes>
     </>
   );

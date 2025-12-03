@@ -1,10 +1,22 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import heartLogo1 from "../../Assets/heartLogo1.png";
 import "./NavbarUser.css";
 
-const NavbarUser = ({ isMedic, userName, onLogout }) => {
+
+
+const NavbarUser = ({ isMedic, userName, onLogout, role }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate(); // 
+
+  const handleSwitchAccount = () => {
+    localStorage.clear(); // clear current login
+    if (role === "medic") {
+      navigate("/medic/login"); // go to medic login
+    } else {
+      navigate("/user/login"); // go to user login
+    }
+  };
 
   return (
     <nav className="navbar">
@@ -26,7 +38,7 @@ const NavbarUser = ({ isMedic, userName, onLogout }) => {
 
           {/* NAVIGATION LINKS */}
           <div className="navbar-links">
-            <Link to="/" className="nav-link">
+            <Link to="/userselection" className="nav-link">
               Home
             </Link>
             <Link to="/dashboard" className="nav-link">
@@ -49,6 +61,14 @@ const NavbarUser = ({ isMedic, userName, onLogout }) => {
             <Link to="/chat" className="nav-link">
               ChatBot
             </Link>
+
+            {/* Medic Dashboard — only for medics */}
+            {isMedic && (
+              <Link to="/medic-dashboard" className="nav-link">
+                User Trend Analysis
+              </Link>
+            )}
+
           </div>
         </div>
 
@@ -104,15 +124,41 @@ const NavbarUser = ({ isMedic, userName, onLogout }) => {
             {/* Dropdown Menu */}
             {menuOpen && (
               <div className="avatar-menu">
+
+                {/* Username */}
                 <p className="menu-user">{userName}</p>
-                <button className="menu-item" onClick={onLogout}>
+
+                {/* Divider line */}
+                <div className="menu-divider"></div>
+
+                {/* View History — only for USERS */}
+                {!isMedic && (
+                  <>
+                    <button
+                      className="menu-item"
+                      onClick={() => navigate("/history")}
+                    >
+                      View History
+                    </button>
+
+                    {/* Divider line */}
+                    <div className="menu-user"></div>
+                  </>
+                )}
+
+                {/* Switch Account */}
+                <button className="menu-item" onClick={handleSwitchAccount}>
                   Switch Account
                 </button>
+
+                {/* Logout */}
                 <button className="menu-item logout" onClick={onLogout}>
                   Logout
                 </button>
               </div>
             )}
+
+
           </div>
         </div>
       </div>

@@ -129,3 +129,31 @@ export async function chat(message, token) {
 
   return data;
 }
+
+export async function getHistory(token) {
+  const res = await fetch(`${API_BASE_URL}/history`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || "Failed to fetch history");
+  }
+
+  return res.json();
+}
+
+//const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:8000";
+
+export async function medicDashboard(token) {
+  const res = await fetch(`${API_BASE_URL}/medic-dashboard`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Failed to fetch" }));
+    throw new Error(error.detail || "Failed to fetch dashboard data");
+  }
+
+  return res.json();
+}

@@ -52,7 +52,7 @@ export default function Login({
       setUserName(res.name);
 
       if (role === "medic") {
-        navigate("/dashboard"); // Medic goes straight to dashboard
+        navigate("/userselection"); // Medic goes to selection page
       } else {
         navigate("/userselection"); // User goes to selection page
       }

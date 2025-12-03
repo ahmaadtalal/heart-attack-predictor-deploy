@@ -18,6 +18,7 @@ import {
 } from "recharts";
 import dashbg from "../Assets/dashbg.jpg";
 import { dashboard } from "../api"; // Import the centralized dashboard fetcher
+import BackToTopButton from "./BackToTopButton.tsx";
 
 // Reusable Chart Card Component
 const ChartCard = ({ title, children, width = 950, style = {} }) => (
@@ -58,7 +59,7 @@ export default function Dashboard({ userName, onLogout }) {
 
   // NOTE: This setter is used in the try block below to consume the data,
   // keeping it here prevents ESLint warnings without breaking the API consumption flow.
-  const [setLifestyleImpactData] = useState({});
+  const [, setLifestyleImpactData] = useState(null); // ✅ declare state
 
   const [cholesterolAnalysis, setCholesterolAnalysis] = useState([]);
   const [glucoseAnalysis, setGlucoseAnalysis] = useState([]);
@@ -205,6 +206,8 @@ export default function Dashboard({ userName, onLogout }) {
         alignItems: "center",
       }}
     >
+      <BackToTopButton />
+
       {/* --- TREND REPORT MODAL --- */}
       {showTrendReport && (
         <div
