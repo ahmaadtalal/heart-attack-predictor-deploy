@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 import pandas as pd # <-- REQUIRED for the updated ml_model.predict_risk function
-import models, schemas
-import ml_model
+from . import models, schemas
+from .import ml_model
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

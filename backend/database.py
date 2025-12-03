@@ -10,7 +10,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # 2. If the environment variable isn't set (i.e., you are testing locally), use the local fallback.
 if not DATABASE_URL:
-    DATABASE_URL = "postgresql://m1:722005postgre@localhost:5432/heartdb"
+    DATABASE_URL = "postgresql://postgres:hrpass@localhost:5432/heartdb"
 
 engine = create_engine(DATABASE_URL)
 print("Connecting to:", DATABASE_URL)

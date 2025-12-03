@@ -6,13 +6,16 @@ import os
 import pandas as pd
 import numpy as np
 from collections import Counter
-from google import genai
+from google.genai import Client
+
 from pydantic import BaseModel
+from . import models, schemas, crud, auth, ml_model
 
 # CORRECTED IMPORTS: Since Render runs the app from the 'backend' directory,
 # we use direct imports instead of 'from backend import...' or relative imports.
-import models, schemas, crud, auth, ml_model
-from database import SessionLocal, engine
+from . import models, schemas, crud, auth, ml_model
+from .database import SessionLocal, engine
+from google import genai
 
 # --- Configuration ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -183,10 +186,63 @@ def evaluate(eval_in: schemas.EvalIn,
 
     return {"risk": entry.risk, "recommendation": rec, "id": entry.id}
 
+@app.get("/history")
+def get_history(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1️⃣ Current user evaluations
+    evaluations = crud.get_evaluations_for_user(db, current_user.id)
+
+    user_result = [
+        {
+            "id": e.id,
+            "age": e.age,
+            "gender": e.gender,
+            "weight": e.weight,
+            "cholesterol": e.cholesterol,
+            "ap_hi": e.ap_hi,
+            "ap_lo": e.ap_lo,
+            "smoke": e.smoke,
+            "active": e.active,
+            "risk": e.risk,
+            "date": e.created_at.strftime("%Y-%m-%d %H:%M:%S")
+        }
+        for e in evaluations
+    ]
+
+    # 2️⃣ Latest evaluation for all users
+    all_users_latest = []
+    users = db.query(models.User).all()
+    for user in users:
+        latest_eval = (
+            db.query(models.Evaluation)
+            .filter(models.Evaluation.user_id == user.id)
+            .order_by(models.Evaluation.created_at.desc())
+            .first()
+        )
+        if latest_eval:
+            all_users_latest.append({
+                "cholesterol": latest_eval.cholesterol,
+                "ap_hi": latest_eval.ap_hi,
+                "ap_lo": latest_eval.ap_lo
+            })
+
+    return {
+        "userHistory": user_result,
+        "allUsersLatest": all_users_latest
+    }
+
+
+
+
 @app.get("/dashboard-analysis")
 def dashboard_analysis():
     # Load dataset. The path is relative to the backend directory on Render.
-    df = pd.read_csv("cardio_train.csv")
+    BASE_DIR = os.path.dirname(__file__)
+    csv_path = os.path.join(BASE_DIR, "cardio_train.csv")
+
+    df = pd.read_csv(csv_path)
     
     # Preprocess dataset with comprehensive cleaning
     df = preprocess_cardio_data(df)
@@ -391,6 +447,109 @@ def dashboard_analysis():
         "glucose_analysis": glucose_analysis,
         "high_risk_profile": high_risk_stats
         
+    }
+    
+@app.get("/medic-dashboard")
+def medic_dashboard(
+    current_user: models.User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1️⃣ Ensure current user is medic
+    if not current_user.is_medic:
+        return {"detail": "Access denied"}, 403
+
+    # 2️⃣ Fetch all users
+    users = db.query(models.User).all()
+    total_users = len(users)
+
+    all_users_latest = []
+    high_risk_count = 0
+    smoking_count = 0
+    active_count = 0
+
+    for user in users:
+        latest_eval = (
+            db.query(models.Evaluation)
+            .filter(models.Evaluation.user_id == user.id)
+            .order_by(models.Evaluation.created_at.desc())
+            .first()
+        )
+        if latest_eval:
+            all_users_latest.append(latest_eval)
+            if latest_eval.risk >= 0.5:  # example threshold for high risk
+                high_risk_count += 1
+            if latest_eval.smoke:
+                smoking_count += 1
+            if latest_eval.active:
+                active_count += 1
+
+    # 3️⃣ Prepare chart data
+    risk_percentages = {"Low": 0, "Medium": 0, "High": 0}
+    gender_percentages = {"Male": 0, "Female": 0}
+    bp_percentages = {"Normal": 0, "Prehypertension": 0, "Hypertension": 0}
+    cholesterol_percentages = {}
+    bmi_percentages = {}
+
+    for e in all_users_latest:
+        # Risk
+        risk_val = e.risk * 100
+        if risk_val < 20:
+            risk_percentages["Low"] += 1
+        elif 20 <= risk_val <= 50:
+            risk_percentages["Medium"] += 1
+        else:
+            risk_percentages["High"] += 1
+
+        # Gender
+        gender_percentages["Male" if e.gender == 1 else "Female"] += 1
+
+        # BP
+        if e.ap_hi < 120 and e.ap_lo < 80:
+            bp_percentages["Normal"] += 1
+        elif 120 <= e.ap_hi < 140 or 80 <= e.ap_lo < 90:
+            bp_percentages["Prehypertension"] += 1
+        else:
+            bp_percentages["Hypertension"] += 1
+
+        # Cholesterol
+        chol_level = e.cholesterol
+        cholesterol_percentages[str(chol_level)] = cholesterol_percentages.get(str(chol_level), 0) + 1
+
+        # BMI
+        # bmi_percentages[str(round(e.weight / ((e.height/100)**2), 1))] = bmi_percentages.get(str(round(e.weight / ((e.height/100)**2), 1)), 0) + 1
+
+    # Convert counts to percentages
+    def to_percentages(d):
+        total = sum(d.values())
+        return {k: round(v / total * 100, 1) for k, v in d.items()}
+
+    return {
+        "total_users": total_users,
+        "high_risk_percentage": round(high_risk_count / total_users * 100, 1),
+        "smoking_percentage": round(smoking_count / total_users * 100, 1),
+        "active_percentage": round(active_count / total_users * 100, 1),
+        "risk_percentages": to_percentages(risk_percentages),
+        "gender_percentages": to_percentages(gender_percentages),
+        "bp_percentages": to_percentages(bp_percentages),
+        "cholesterol_percentages": to_percentages(cholesterol_percentages),
+        "bmi_percentages": to_percentages(bmi_percentages),
+        "latest_evals": [
+            {
+                "id": e.id,
+                "name": e.user.name,
+                "age": e.age,
+                "gender": e.gender,
+                "weight": e.weight,
+                "cholesterol": e.cholesterol,
+                "ap_hi": e.ap_hi,
+                "ap_lo": e.ap_lo,
+                "smoke": e.smoke,
+                "active": e.active,
+                "risk": e.risk,
+                "date": e.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            for e in all_users_latest
+        ],
     }
 
 # ------------------ Gemini Chat ------------------

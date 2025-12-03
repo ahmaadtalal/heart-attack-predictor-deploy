@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix
 
 # CORRECTED PATH: Relative to the backend directory where the model lives.
-MODEL_PATH = "model.joblib"
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "model.joblib")
 FEATURE_ORDER = ['age', 'gender', 'weight', 'cholesterol', 'ap_hi', 'ap_lo', 'smoke', 'active']
 
 def preprocess(df):
